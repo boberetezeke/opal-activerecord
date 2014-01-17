@@ -1,22 +1,30 @@
+GIT
+  remote: git://github.com/opal/opal.git
+  revision: 139b534a8e14719f1406318d432b305ba76db4b1
+  specs:
+    opal (0.6.0)
+      source_map
+      sprockets
+
+PATH
+  remote: .
+  specs:
+    opal-activerecord (0.0.1)
+      opal (>= 0.5.0, < 1.0.0)
+
 GEM
   remote: https://rubygems.org/
   specs:
     hike (1.2.3)
     json (1.8.1)
-    multi_json (1.8.2)
-    opal (0.5.0)
-      source_map
-    opal-rspec (0.1.0)
-      opal (~> 0.5.0)
-      opal-sprockets (~> 0.3.0)
-    opal-sprockets (0.3.0)
-      opal (~> 0.5.0)
-      sprockets
+    multi_json (1.8.4)
+    opal-rspec (0.3.0.beta2)
+      opal (>= 0.6.0, < 1.0.0)
     rack (1.5.2)
     rake (10.1.0)
     source_map (3.0.1)
       json
-    sprockets (2.10.0)
+    sprockets (2.10.1)
       hike (~> 1.2)
       multi_json (~> 1.0)
       rack (~> 1.0)
@@ -27,5 +35,7 @@ PLATFORMS
   ruby
 
 DEPENDENCIES
-  opal-rspec
+  opal!
+  opal-activerecord!
+  opal-rspec (= 0.3.0.beta2)
   rake

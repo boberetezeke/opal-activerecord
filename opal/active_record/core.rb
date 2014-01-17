@@ -282,19 +282,19 @@ module ActiveRecord
       init_new_table(table_name)
       next_id = gen_next_id(table_name)
       @tables[table_name][next_id] = record
-      @change_callback.call(:insert, record)
+      @change_callback.call(:insert, record) if @change_callback
       return next_id
     end
 
     def update(table_name, record)
       init_new_table(table_name)
       table = @tables[table_name]
-      @change_callback.call(:update, record) if record.attributes != table[record.id]
+      @change_callback.call(:update, record) if @change_callback && record.attributes != table[record.id]
       table[record.id] = record
     end
 
     def destroy(table_name, record)
-      @change_callback.call(:delete, record)
+      @change_callback.call(:delete, record) if @change_callback
       @tables[table_name].delete(record.id)
     end
 

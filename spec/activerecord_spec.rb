@@ -1,5 +1,5 @@
 require 'spec_helper'
-require 'activerecord'
+require 'active_record'
 
 class A < ActiveRecord::Base
 end
@@ -28,6 +28,12 @@ describe "ActiveRecord::Base" do
     let(:memory_store) { ActiveRecord::MemoryStore.new }
     before do
       ActiveRecord::Base.connection = memory_store
+    end
+  end
+
+  context "when using an active record model with no associations" do
+    it "should be true" do
+      expect(nil).to eq(nil)
     end
   end
 
@@ -68,6 +74,7 @@ describe "ActiveRecord::Base" do
           expect(memory_store.tables["as"].size).to eq(1)
         end
       end
+
     end
 
     context "when searching for objects" do
