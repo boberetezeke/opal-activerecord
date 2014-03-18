@@ -160,7 +160,7 @@ module ActiveRecord
     end
 
     def method_missing(sym, *args, &block)
-      if [:first, :last, :all, :load].include?(sym)
+      if [:first, :last, :all, :load, :reverse].include?(sym)
         where_clause = "#{@owner.table_name.singularize}_id"
         debug "#{sym}: for table: #{@association.table_name}, where: #{where_clause} == #{@owner.id}"
         Relation.new(@connection, @association.table_name).where(where_clause => @owner.id).send(sym)
@@ -213,6 +213,10 @@ module ActiveRecord
 
     def last
       execute.last
+    end
+
+    def reverse
+      execute.reverse
     end
 
     def [](index)
@@ -321,6 +325,15 @@ module ActiveRecord
       object = self.new
       object.attributes = json
       object
+    end
+
+    def self.accepts_nested_attributes_for(*args)
+    end
+
+    def self.default_scope(*args)
+    end
+
+    def self.scope(*args)
     end
 
     def self.has_many(name, options={})
