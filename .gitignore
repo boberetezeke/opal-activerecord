@@ -1,0 +1,5 @@
+# VIM
+.backups
+**/.backups
+*.swp
+
