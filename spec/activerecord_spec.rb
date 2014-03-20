@@ -1,5 +1,4 @@
 require 'spec_helper'
-require 'active_record'
 
 class A < ActiveRecord::Base
 end
@@ -24,11 +23,44 @@ class E < ActiveRecord::Base
 end
 
 describe "ActiveRecord::Base" do
-  if RUBY_ENGINE == "opal"
-    let(:memory_store) { ActiveRecord::MemoryStore.new }
-    before do
-      ActiveRecord::Base.connection = memory_store
+  # only set memory_store for opal
+  let(:memory_store) { ActiveRecord::MemoryStore.new }
+  before do
+    ActiveRecord::Base.connection = memory_store
+  end
+
+  describe ".new_from_json" do
+    context "when constructing just one object" do
+      it "should set attributes on a class with no relationships" do
+        a = A.new_from_json({"x" => 1, "y" => 2})
+        expect(a.x).to eq(1)
+        expect(a.y).to eq(2)
+      end
+
+      it "should set attributes on a class with a has_many relationship" do
+        b = B.new_from_json({"x" => 1, "y" => 2})
+        expect(b.x).to eq(1)
+        expect(b.y).to eq(2)
+      end
+
+      it "should set attributes on a class with a belongs_to relationship" do
+        d = D.new_from_json({"x" => 1, "y" => 2})
+        expect(d.x).to eq(1)
+        expect(d.y).to eq(2)
+      end
     end
+=begin
+    context "when contructing an object with a has_many that contains embedded has_many objects" do
+      it "should create the first object and the has_many objects" do
+        b = B.new_from_json({x: 1, y: 2, cs: [{s: 3, t: 4}]})
+        expect(b.x).to eq(1)
+        expect(b.y).to eq(2)
+        expect(b.c.size).to eq(1)
+        #expect(b.c.first.s).to eq(3)
+        #expect(b.c.first.t).to eq(4)
+      end
+    end
+=end
   end
 
   context "when using an active record model with no associations" do
@@ -68,11 +100,10 @@ describe "ActiveRecord::Base" do
         expect(a.id).to_not be_nil
       end
 
-      if RUBY_ENGINE == "opal"
-        it "is in the store after the save" do
-          a.save
-          expect(memory_store.tables["as"].size).to eq(1)
-        end
+      # only for memory_store
+      it "is in the store after the save" do
+        a.save
+        expect(memory_store.tables["as"].size).to eq(1)
       end
 
     end

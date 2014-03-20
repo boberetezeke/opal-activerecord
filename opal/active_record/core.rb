@@ -5,7 +5,7 @@ class String
 end
 
 def debug(str)
-  puts(str) #if $debug_on
+  #puts(str) #if $debug_on
 end
 
 module Arel
@@ -126,7 +126,7 @@ module ActiveRecord
     end
 
     def table_name
-      (@association_type == :belongs_to) ? @name + "s" : @name
+      (@association_type == :belongs_to) ? @name.to_s + "s" : @name.to_s
     end
 
     def all
@@ -249,7 +249,7 @@ module ActiveRecord
       debug "MemoryStore#execute: table name = #{select_manager.table_name}"
       debug "MemoryStore#execute: tables = #{@tables.keys}"
       debug "MemoryStore#node = #{select_manager.node}"
-      records = @tables[select_manager.table_name].values.select do |record|
+      records = @tables[select_manager.table_name.to_s].values.select do |record|
         if select_manager.node
           debug "MemoryStore#execute: checking record: #{record}"
           select_manager.node.value(record)
@@ -282,7 +282,7 @@ module ActiveRecord
     end
 
     def create(table_name, record)
-      puts "MemoryStore#Create(#{record})"
+      debug "MemoryStore#Create(#{record})"
       init_new_table(table_name)
       next_id = gen_next_id(table_name)
       @tables[table_name][next_id] = record
@@ -430,6 +430,7 @@ module ActiveRecord
     end
 
     def write_attribute(attribute_name, new_value)
+      attribute_name = attribute_name.to_s
       old_value = self.attributes[attribute_name]
       self.attributes[attribute_name] = new_value
 
@@ -441,7 +442,7 @@ module ActiveRecord
     end
 
     def read_attribute(attribute_name)
-      self.attributes[attribute_name]
+      self.attributes[attribute_name.to_s]
     end
 
     def write_value(name, new_value)
