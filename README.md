@@ -45,3 +45,7 @@ run that:
 3. Commit your changes (`git commit -am 'Add some feature'`)
 4. Push to the branch (`git push origin my-new-feature`)
 5. Create new Pull Request
+
+## License
+
+opal-activerecord is Copyright © 2014 Steve Tuckner. It is free software, and may be redistributed under the terms specified in the LICENSE file (an MIT License).

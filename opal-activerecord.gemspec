@@ -8,9 +8,15 @@ Gem::Specification.new do |gem|
   gem.version       = Opal::Activerecord::VERSION
   gem.authors       = ['Steve Tuckner']
   gem.email         = ['stevetuckner@stewdle.com']
-  gem.description   = %q{A small port of the glorious ActiveRecord for Opal}
   gem.summary       = %q{A small port of the glorious ActiveRecord for Opal}
-  gem.homepage      = 'http://opalrb.org'
+  gem.description   = %q{
+                        This implements a subset of the rails/activerecord.
+                        It currently handles has_many and belongs_to
+                        associations, saving, finding and simple where
+                        queries. 
+                      }
+  gem.licenses      = ['MIT']
+  gem.homepage      = 'https://github.com/boberetezeke/opal-activerecord'
   gem.rdoc_options << '--main' << 'README' <<
                       '--line-numbers' <<
                       '--include' << 'opal'
