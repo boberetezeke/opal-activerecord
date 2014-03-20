@@ -23,44 +23,69 @@ class E < ActiveRecord::Base
 end
 
 describe "ActiveRecord::Base" do
-  # only set memory_store for opal
-  let(:memory_store) { ActiveRecord::MemoryStore.new }
-  before do
-    ActiveRecord::Base.connection = memory_store
+  if running_with_real_active_record
+    before do
+      ActiveRecord::Base.establish_connection(
+        adapter:  'sqlite3',
+        database: 'test.sqlite3'
+      )
+      ActiveRecord::Base.connection.create_table("as") {|t| t.integer :x; t.integer :y}
+      ActiveRecord::Base.connection.create_table("bs") {|t| t.integer :x; t.integer :y}
+      ActiveRecord::Base.connection.create_table("cs") {|t| t.integer :x; t.integer :y; t.integer :b_id}
+      ActiveRecord::Base.connection.create_table("ds") {|t| t.integer :x; t.integer :y; t.integer :c_id; t.integer :e_id}
+      ActiveRecord::Base.connection.create_table("es") {|t| t.integer :x; t.integer :y}
+    end
+
+    after do
+      ActiveRecord::Base.connection.drop_table("as")
+      ActiveRecord::Base.connection.drop_table("bs")
+      ActiveRecord::Base.connection.drop_table("cs")
+      ActiveRecord::Base.connection.drop_table("ds")
+      ActiveRecord::Base.connection.drop_table("es")
+    end
+  else
+    # only set memory_store for opal
+    let(:memory_store) { ActiveRecord::MemoryStore.new }
+    before do
+      ActiveRecord::Base.connection = memory_store
+    end
   end
 
-  describe ".new_from_json" do
-    context "when constructing just one object" do
-      it "should set attributes on a class with no relationships" do
-        a = A.new_from_json({"x" => 1, "y" => 2})
-        expect(a.x).to eq(1)
-        expect(a.y).to eq(2)
+  if !running_with_real_active_record
+    describe ".new_from_json" do
+      context "when constructing just one object" do
+        it "should set attributes on a class with no relationships" do
+          a = A.new_from_json({"x" => 1, "y" => 2})
+          expect(a.x).to eq(1)
+          expect(a.y).to eq(2)
+        end
+
+        it "should set attributes on a class with a has_many relationship" do
+          b = B.new_from_json({"x" => 1, "y" => 2})
+          expect(b.x).to eq(1)
+          expect(b.y).to eq(2)
+        end
+
+        it "should set attributes on a class with a belongs_to relationship" do
+          d = D.new_from_json({"x" => 1, "y" => 2})
+          expect(d.x).to eq(1)
+          expect(d.y).to eq(2)
+        end
       end
 
-      it "should set attributes on a class with a has_many relationship" do
-        b = B.new_from_json({"x" => 1, "y" => 2})
-        expect(b.x).to eq(1)
-        expect(b.y).to eq(2)
-      end
-
-      it "should set attributes on a class with a belongs_to relationship" do
-        d = D.new_from_json({"x" => 1, "y" => 2})
-        expect(d.x).to eq(1)
-        expect(d.y).to eq(2)
-      end
-    end
 =begin
-    context "when contructing an object with a has_many that contains embedded has_many objects" do
-      it "should create the first object and the has_many objects" do
-        b = B.new_from_json({x: 1, y: 2, cs: [{s: 3, t: 4}]})
-        expect(b.x).to eq(1)
-        expect(b.y).to eq(2)
-        expect(b.c.size).to eq(1)
-        #expect(b.c.first.s).to eq(3)
-        #expect(b.c.first.t).to eq(4)
+      context "when contructing an object with a has_many that contains embedded has_many objects" do
+        it "should create the first object and the has_many objects" do
+          b = B.new_from_json({x: 1, y: 2, cs: [{s: 3, t: 4}]})
+          expect(b.x).to eq(1)
+          expect(b.y).to eq(2)
+          expect(b.c.size).to eq(1)
+          #expect(b.c.first.s).to eq(3)
+          #expect(b.c.first.t).to eq(4)
+        end
       end
-    end
 =end
+    end
   end
 
   context "when using an active record model with no associations" do
@@ -100,10 +125,11 @@ describe "ActiveRecord::Base" do
         expect(a.id).to_not be_nil
       end
 
-      # only for memory_store
-      it "is in the store after the save" do
-        a.save
-        expect(memory_store.tables["as"].size).to eq(1)
+      if !running_with_real_active_record
+        it "is in the store after the save" do
+          a.save
+          expect(memory_store.tables["as"].size).to eq(1)
+        end
       end
 
     end

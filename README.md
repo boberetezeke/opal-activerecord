@@ -23,6 +23,20 @@ Inside your `application.js.rb`:
 require 'active_record'                 # to require the whole active record lib
 ```
 
+## Testing
+
+There are two ways to run tests. You can run them inside of MRI
+for ease of testing and better debuggability or you can run them
+using Opal (as this is how it will actually be used).
+
+* To run in Opal do - rake
+* To run in MRI do - rspec spec
+
+In addition to this, you can run the spec against the real active
+record to make sure the tests duplicate the functionality there. To
+run that:
+
+* run_with_real_active_record=true rspec spec
 
 ## Contributing
 
