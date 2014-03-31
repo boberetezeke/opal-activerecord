@@ -22,6 +22,25 @@ class E < ActiveRecord::Base
   has_many :cs, :through => :ds
 end
 
+class MockLocalStorage
+  attr_reader :storage
+  def initialize
+    @storage = {}
+  end
+
+  def set(name, value)
+    @storage[name] = value
+  end
+
+  def get(name)
+    @storage[name]
+  end
+
+  def delete(name)
+    @storage.delete(name)
+  end
+end
+
 describe "ActiveRecord::Base" do
   if running_with_real_active_record
     before do
@@ -45,7 +64,9 @@ describe "ActiveRecord::Base" do
     end
   else
     # only set memory_store for opal
-    let(:memory_store) { ActiveRecord::MemoryStore.new }
+    let(:mock_local_storage) { MockLocalStorage.new }
+    let(:memory_store) { ActiveRecord::LocalStorageStore.new(mock_local_storage) }
+    #let(:memory_store) { ActiveRecord::MemoryStore.new }
     before do
       ActiveRecord::Base.connection = memory_store
     end
@@ -128,7 +149,8 @@ describe "ActiveRecord::Base" do
       if !running_with_real_active_record
         it "is in the store after the save" do
           a.save
-          expect(memory_store.tables["as"].size).to eq(1)
+          #expect(memory_store.tables["as"].size).to eq(1)
+          expect(mock_local_storage.get("as:index").size).to eq(1)
         end
       end
 
