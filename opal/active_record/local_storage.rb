@@ -1,5 +1,5 @@
 class LocalStorage
-  def self.set(name, data)
+  def set(name, data)
     return if data.nil?
     if !data.is_a?(Hash)
       data = {__data: data}
@@ -14,7 +14,7 @@ class LocalStorage
   
   #
   # 
-  def self.get(name)
+  def get(name)
     data = `(function(name) {var val = window.localStorage.getItem(name); return (val == null) ? Opal.nil : Opal.hash(JSON.parse(val));})(name)`
     return nil if data.nil?
     if (data.keys == ['__data'])
@@ -23,7 +23,7 @@ class LocalStorage
     return data
   end
 
-  def self.remove(name)
+  def remove(name)
     `window.localStorage.removeItem(name)`
   end
 end
