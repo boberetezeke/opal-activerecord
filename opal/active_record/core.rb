@@ -428,6 +428,11 @@ module ActiveRecord
       @change_callback.call(:delete, record) if @change_callback
     end
 
+
+    def init_new_table(table_name)
+      get_table(table_name)
+    end
+
     def to_s
       @tables.each.map do |table_name, table|
         "#{table_name}::#{table.next_id}::#{table.get_all_record_attributes.inspect}"

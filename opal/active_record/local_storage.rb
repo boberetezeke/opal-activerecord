@@ -15,7 +15,15 @@ class LocalStorage
   #
   # 
   def get(name)
-    data = `(function(name) {var val = window.localStorage.getItem(name); return (val == null) ? Opal.nil : Opal.hash(JSON.parse(val));})(name)`
+    data = `(function(name) { 
+              var val = window.localStorage.getItem(name); 
+              if (val == null)
+                return Opal.nil;
+              hash = Opal.hash();
+              hash.map = JSON.parse(val);
+              hash.keys = Object.keys(hash.map);
+              return hash
+            })(name)`
     return nil if data.nil?
     if (data.keys == ['__data'])
       data = data['__data']
