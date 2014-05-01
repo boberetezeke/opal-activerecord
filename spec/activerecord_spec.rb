@@ -73,39 +73,183 @@ describe "ActiveRecord::Base" do
   end
 
   if !running_with_real_active_record
-    describe ".new_from_json" do
+    describe ".new_from_hash" do
       context "when constructing just one object" do
-        it "should set attributes on a class with no relationships" do
-          a = A.new_from_json({"x" => 1, "y" => 2})
-          expect(a.x).to eq(1)
-          expect(a.y).to eq(2)
+        context "when using a top level class" do
+          it "should set attributes on a class with no relationships" do
+            a = ActiveRecord::Base.new_from_hash({"x" => 1, "y" => 2}, A)
+            expect(a.x).to eq(1)
+            expect(a.y).to eq(2)
+          end
+
+          it "should set attributes on a class with a has_many relationship" do
+            b = ActiveRecord::Base.new_from_hash({"x" => 1, "y" => 2}, B)
+            expect(b.x).to eq(1)
+            expect(b.y).to eq(2)
+          end
+
+          it "should set attributes on a class with a belongs_to relationship" do
+            d = ActiveRecord::Base.new_from_hash({"x" => 1, "y" => 2}, D)
+            expect(d.x).to eq(1)
+            expect(d.y).to eq(2)
+          end
         end
 
-        it "should set attributes on a class with a has_many relationship" do
-          b = B.new_from_json({"x" => 1, "y" => 2})
-          expect(b.x).to eq(1)
-          expect(b.y).to eq(2)
+        context "when NOT using a root key" do
+          it "should set attributes on a class with no relationships" do
+            a = A.new_from_hash({"x" => 1, "y" => 2})
+            expect(a.x).to eq(1)
+            expect(a.y).to eq(2)
+          end
+
+          it "should set attributes on a class with a has_many relationship" do
+            b = B.new_from_hash({"x" => 1, "y" => 2})
+            expect(b.x).to eq(1)
+            expect(b.y).to eq(2)
+          end
+
+          it "should set attributes on a class with a belongs_to relationship" do
+            d = D.new_from_hash({"x" => 1, "y" => 2})
+            expect(d.x).to eq(1)
+            expect(d.y).to eq(2)
+          end
         end
 
-        it "should set attributes on a class with a belongs_to relationship" do
-          d = D.new_from_json({"x" => 1, "y" => 2})
-          expect(d.x).to eq(1)
-          expect(d.y).to eq(2)
+        context "when using a root key" do
+          it "should set attributes on a class with no relationships" do
+            a = A.new_from_hash({"a" => {"x" => 1, "y" => 2}})
+            expect(a.x).to eq(1)
+            expect(a.y).to eq(2)
+          end
+
+          it "should set attributes on a class with a has_many relationship" do
+            b = B.new_from_hash({"b" => {"x" => 1, "y" => 2}})
+            expect(b.x).to eq(1)
+            expect(b.y).to eq(2)
+          end
+
+          it "should set attributes on a class with a belongs_to relationship" do
+            d = D.new_from_hash({"d" => {"x" => 1, "y" => 2}})
+            expect(d.x).to eq(1)
+            expect(d.y).to eq(2)
+          end
         end
       end
 
-=begin
       context "when contructing an object with a has_many that contains embedded has_many objects" do
-        it "should create the first object and the has_many objects" do
-          b = B.new_from_json({x: 1, y: 2, cs: [{s: 3, t: 4}]})
-          expect(b.x).to eq(1)
-          expect(b.y).to eq(2)
-          expect(b.c.size).to eq(1)
-          #expect(b.c.first.s).to eq(3)
-          #expect(b.c.first.t).to eq(4)
+        context "when NOT using a root key" do
+          it "should create the first object and the has_many objects" do
+            b = B.new_from_hash({x: 1, y: 2, cs: [{s: 3, t: 4}]})
+            expect(b.x).to eq(1)
+            expect(b.y).to eq(2)
+            expect(b.cs.size).to eq(1)
+            expect(b.cs.first.s).to eq(3)
+            expect(b.cs.first.t).to eq(4)
+          end
+        end
+
+        context "when using a root key" do
+          it "should create the first object and the has_many objects" do
+            b = B.new_from_hash(b: {x: 1, y: 2, cs: [{s: 3, t: 4}]})
+            expect(b.x).to eq(1)
+            expect(b.y).to eq(2)
+            expect(b.cs.size).to eq(1)
+            expect(b.cs.first.s).to eq(3)
+            expect(b.cs.first.t).to eq(4)
+          end
         end
       end
-=end
+
+      context "when contructing an object with a has_many that contains embedded objects that also have many objects" do
+        it "should create the first object and the has_many objects" do
+          $debug_on = true
+          b = B.new_from_hash({x: 1, y: 2, cs: [{s: 3, t: 4, ds: [{m: 5, n: 6}]}]})
+          $debug_on = false
+          expect(b.x).to eq(1)
+          expect(b.y).to eq(2)
+          expect(b.cs.size).to eq(1)
+          expect(b.cs.first.s).to eq(3)
+          expect(b.cs.first.t).to eq(4)
+          expect(b.cs.first.ds.size).to eq(1)
+          expect(b.cs.first.ds.first.m).to eq(5)
+          expect(b.cs.first.ds.first.n).to eq(6)
+        end
+      end
+    end
+
+    describe ".new_objects_from_array" do
+      context "when constructing objects from an array" do
+        context "when NOT using a root key" do
+          it "should set attributes on a class" do
+            as = A.new_objects_from_array([{"x" => 1, "y" => 2}])
+            expect(as.size).to eq(1)
+            expect(as.first.x).to eq(1)
+            expect(as.first.y).to eq(2)
+          end
+        end
+
+        context "when using a root key" do
+          it "should set attributes on a class" do
+            as = A.new_objects_from_array([{a: {"x" => 1, "y" => 2}}])
+            expect(as.size).to eq(1)
+            expect(as.first.x).to eq(1)
+            expect(as.first.y).to eq(2)
+          end
+        end
+      end
+    end
+
+    describe ".new_objects_from_hash" do
+      context "when constructing objects from a hash" do
+        context "when NOT using a root key" do
+          it "should set attributes on a class" do
+            as = A.new_objects_from_hash({"x" => 1, "y" => 2})
+            expect(as.size).to eq(1)
+            expect(as.first.x).to eq(1)
+            expect(as.first.y).to eq(2)
+          end
+        end
+
+        context "when using a root key" do
+          it "should set attributes on a class" do
+            as = A.new_objects_from_hash({a: {"x" => 1, "y" => 2}})
+            expect(as.size).to eq(1)
+            expect(as.first.x).to eq(1)
+            expect(as.first.y).to eq(2)
+          end
+        end
+      end
+    end
+
+    describe ".new_objects_from_json" do
+      context "when the top level object is a hash" do
+        it "should set attributes on a class" do
+          as = A.new_objects_from_json('{"x": 1, "y": 2}')
+          expect(as.size).to eq(1)
+          expect(as.first.x).to eq(1)
+          expect(as.first.y).to eq(2)
+        end
+
+        it "should create the first object and the has_many objects" do
+          bs = B.new_objects_from_json('{"b": {"x": 1, "y": 2, "cs": [{"s": 3, "t": 4}]}}')
+          expect(bs.size).to eq(1)
+          b = bs.first
+          expect(b.x).to eq(1)
+          expect(b.y).to eq(2)
+          expect(b.cs.size).to eq(1)
+          expect(b.cs.first.s).to eq(3)
+          expect(b.cs.first.t).to eq(4)
+        end
+      end
+
+      context "when the top level object is an array" do
+        it "should set attributes on a class" do
+          as = A.new_objects_from_json('[{"x": 1, "y": 2}]')
+          expect(as.size).to eq(1)
+          expect(as.first.x).to eq(1)
+          expect(as.first.y).to eq(2)
+        end
+      end
     end
   end
 

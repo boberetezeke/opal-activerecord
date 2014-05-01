@@ -13,7 +13,7 @@ class String
 end
 
 def debug(str)
-  #puts(str) #if $debug_on
+  #puts(str) if $debug_on
 end
 
 module Arel
@@ -528,19 +528,79 @@ module ActiveRecord
   class Base
     attr_accessor :attributes, :observers
 
-    def self.new_from_json(json)
-      object = self.new
-      object.attributes = json
-      object
+    def self.new_objects_from_json(json, top_level_class=nil)
+      # if its a hash
+      if /^\s*{/.match(json, top_level_class)
+        return new_objects_from_hash(JSON.parse(json), top_level_class)
+      elsif /^\s*\[/.match(json)
+        return new_objects_from_array(JSON.parse(json), top_level_class)
+      else
+        raise "Unsupported JSON format (neither a hash or array)"
+      end
+    end
+
+    def self.new_objects_from_hash(hash, top_level_class=nil)
+      [new_from_hash(hash, top_level_class)]
+    end
+
+    def self.new_objects_from_array(array, top_level_class=nil)
+      array.map do |attributes|
+        new_from_hash(attributes, top_level_class)
+      end.flatten
+    end
+
+    def self.new_from_hash(hash, top_level_class=nil)
+      #puts "new_from_hash=#{hash}, top_level_class=#{top_level_class}"
+
+      klass, hash = new_object_class(top_level_class, hash)
+      object = klass.new
+
+      #puts "object = #{object.inspect}"
+      #puts "hash keys = #{hash.keys}"
+      #puts "association keys = #{klass.associations.keys}"
+
+      association_keys = hash.keys & klass.associations.keys
+      association_keys.each do |key|
+        attributes = hash.delete(key)
+        if attributes.is_a?(Array)
+          hash[key] = new_objects_from_array(attributes, klass.associations[key].klass)
+        else
+          hash[key] = new_from_hash(attributes)
+        end
+      end
+
+      object.attributes = hash
+
+      return object
+    end
+
+    def self.new_object_class(top_level_class, hash)
+      klass = top_level_class
+
+      # attempt to extract the class name from the top level hash
+      if !klass && hash.keys.size == 1
+        class_name = hash.keys.first
+        hash = hash.values.first
+
+        # convert to uppercase name
+        class_name = class_name[0..0].upcase + class_name[1..-2]
+        klass = Object.const_get(class_name) 
+      end
+
+      klass = self unless klass
+
+      return [klass, hash]
     end
 
     def self.accepts_nested_attributes_for(*args)
     end
 
     def self.default_scope(*args)
+      # FIXME: Implement
     end
 
     def self.scope(*args)
+      # FIXME: Implement
     end
 
     def self.has_many(name, options={})
