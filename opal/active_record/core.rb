@@ -418,7 +418,10 @@ module ActiveRecord
       debug "LocalStorageStore#update: #{table_name}, #{record}"
       table = get_table(table_name)
       old_record_attributes = table.get_record_attributes(record.id)
-      @change_callback.call(:update, record) if @change_callback && record.attributes != old_record_attributes 
+      if old_record_attributes
+        @change_callback.call(:update, record) if @change_callback && record.attributes != old_record_attributes 
+      end
+      debug "LocalStorageStore#update: putting to #{record.id}, #{record.attributes}"
       table.put_record_attributes(record.id, record.attributes)
     end
 
@@ -500,7 +503,10 @@ module ActiveRecord
     def update(klass, table_name, record)
       init_new_table(table_name)
       table = @tables[table_name]
-      @change_callback.call(:update, record) if @change_callback && record.attributes != table[record.id]
+      old_attributes = table[record.id]
+      if old_attributes
+        @change_callback.call(:update, record) if @change_callback && record.attributes != table[record.id]
+      end
       table[record.id] = record
     end
 
@@ -732,10 +738,8 @@ module ActiveRecord
       if assoc.association_type == :has_many
         if self.id
           values_or_value.each do |object|
-            if object.read_attribute(assoc.foreign_key) != self.id
-              object.write_attribute(assoc.foreign_key, self.id)
-              object.save
-            end
+            object.write_attribute(assoc.foreign_key, self.id)
+            object.save
           end
         else
           @association_values[assoc.name] = values_or_value
@@ -763,14 +767,9 @@ module ActiveRecord
         if self.id 
           if assoc.association_type == :has_many
             write_association_value(assoc, new_value)
-            #new_value.each do |value|
-            #  value.write_attribute("#{table_name.singularize}_id", self.id)
-            #  value.save
-            #end
           elsif assoc.association_type == :belongs_to
             if new_value.id
               write_attribute(assoc.foreign_key, new_value.id)
-
             else
               write_association_value(assoc, new_value)
             end
@@ -832,7 +831,7 @@ module ActiveRecord
         @attributes['id'] = connection.create(self.class, table_name, self)
       end
 
-      debug "save: memory(after) = #{connection}"
+      debug "save: memory(after) = #{connection.to_s}"
     end
 
     def destroy
@@ -852,7 +851,7 @@ module ActiveRecord
     end
 
     def to_s
-      "#{self.class}:#{self.attributes}"
+      "#{self.class}: attributes: #{@attributes}, assoc_values: #{@association_values}"
     end
   end
 end
