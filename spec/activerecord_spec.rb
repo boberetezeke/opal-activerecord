@@ -139,7 +139,7 @@ describe "ActiveRecord::Base" do
       context "when contructing an object with a has_many that contains embedded has_many objects" do
         context "when NOT using a root key" do
           it "should create the first object and the has_many objects" do
-            b = B.new_from_hash({x: 1, y: 2, cs: [{s: 3, t: 4}]})
+            b = B.new_from_hash({'x' => 1, 'y' => 2, 'cs' => [{'s' => 3, 't' => 4}]})
             expect(b.x).to eq(1)
             expect(b.y).to eq(2)
             expect(b.cs.size).to eq(1)
@@ -150,7 +150,7 @@ describe "ActiveRecord::Base" do
 
         context "when using a root key" do
           it "should create the first object and the has_many objects" do
-            b = B.new_from_hash(b: {x: 1, y: 2, cs: [{s: 3, t: 4}]})
+            b = B.new_from_hash('b' => {'x' => 1, 'y' => 2, 'cs' => [{'s' => 3, 't' => 4}]})
             expect(b.x).to eq(1)
             expect(b.y).to eq(2)
             expect(b.cs.size).to eq(1)
@@ -163,7 +163,7 @@ describe "ActiveRecord::Base" do
       context "when contructing an object with a has_many that contains embedded objects that also have many objects" do
         it "should create the first object and the has_many objects" do
           $debug_on = true
-          b = B.new_from_hash({x: 1, y: 2, cs: [{s: 3, t: 4, ds: [{m: 5, n: 6}]}]})
+          b = B.new_from_hash({'x' => 1, 'y' => 2, 'cs' => [{'s' => 3, 't' => 4, 'ds' => [{'m' => 5, 'n' => 6}]}]})
           $debug_on = false
           expect(b.x).to eq(1)
           expect(b.y).to eq(2)
@@ -190,7 +190,7 @@ describe "ActiveRecord::Base" do
 
         context "when using a root key" do
           it "should set attributes on a class" do
-            as = A.new_objects_from_array([{a: {"x" => 1, "y" => 2}}])
+            as = A.new_objects_from_array([{"a" => {"x" => 1, "y" => 2}}])
             expect(as.size).to eq(1)
             expect(as.first.x).to eq(1)
             expect(as.first.y).to eq(2)
@@ -212,7 +212,7 @@ describe "ActiveRecord::Base" do
 
         context "when using a root key" do
           it "should set attributes on a class" do
-            as = A.new_objects_from_hash({a: {"x" => 1, "y" => 2}})
+            as = A.new_objects_from_hash({"a" => {"x" => 1, "y" => 2}})
             expect(as.size).to eq(1)
             expect(as.first.x).to eq(1)
             expect(as.first.y).to eq(2)
@@ -344,9 +344,10 @@ describe "ActiveRecord::Base" do
   end
 
   context "when using an active record models with has_many/belongs_to associations" do
-    let(:b) { B.new(x:1) }
-    let(:c) { C.new(y:1) }
-    let(:d) { D.new(x:1, y:1) }
+    let(:b)  { B.new(x:1) }
+    let(:c)  { C.new(y:1) }
+    let(:c2) { C.new(y:2) }
+    let(:d)  { D.new(x:1, y:1) }
 
     context "when the objects are not yet saved" do
 
@@ -358,10 +359,41 @@ describe "ActiveRecord::Base" do
         expect(c.b).to be_nil
       end
 
-      it "allows setting of C object on B" do
-        b.cs = [c]
-        expect(b.cs).to eq([c])
+      context "when writing to a has_many association" do
+        context "when assigning an array of objects" do
+          it "allows setting of C object on B" do
+            b.cs = [c]
+            expect(b.cs).to eq([c])
+          end
+
+          it "saves unsaved objects that are referenced in a has_many association" do
+            b.cs = [c]
+            b.save
+
+            expect(c.id).to_not be_nil
+          end
+
+          it "doesn't save when assigning to a has_many association with all unsaved objects" do
+            b.cs = [c, c2]
+
+            expect(c.id).to be_nil
+            expect(c2.id).to be_nil
+          end
+
+          it "saves when assigning to a has_many association with some saved objects" do
+            b.save
+            c.save
+            b.cs = [c, c2]
+
+            expect(c.id).to_not be_nil
+            expect(C.find(c.id).b).to eq(b)
+            expect(c.b).to eq(b)
+            expect(c2.id).to_not be_nil
+            expect(c2.b).to eq(b)
+          end
+        end
       end
+
 
       it "allows setting of B object on C" do
         c.b = b

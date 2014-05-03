@@ -13,7 +13,7 @@ class String
 end
 
 def debug(str)
-  #puts(str) if $debug_on
+  #puts(str) #if $debug_on
 end
 
 module Arel
@@ -119,7 +119,7 @@ end
 
 module ActiveRecord
   class Association
-    attr_reader :foreign_key, :association_type
+    attr_reader :foreign_key, :association_type, :name
 
     def initialize(klass, association_type, name, options, connection)
       @association_type = association_type
@@ -386,7 +386,7 @@ module ActiveRecord
         select_manager.klass.new(attributes) 
       end.select do |record|
         if select_manager.node
-          debug "LocalStorageStore#execute: checking record: #{record}"
+          debug "LocalStorageStore#execute: node: #{select_manager.node}, checking record: #{record}"
           select_manager.node.value(record)
         else
           true
@@ -530,7 +530,7 @@ module ActiveRecord
 
     def self.new_objects_from_json(json, top_level_class=nil)
       # if its a hash
-      if /^\s*{/.match(json, top_level_class)
+      if /^\s*{/.match(json)
         return new_objects_from_hash(JSON.parse(json), top_level_class)
       elsif /^\s*\[/.match(json)
         return new_objects_from_array(JSON.parse(json), top_level_class)
@@ -555,11 +555,26 @@ module ActiveRecord
       klass, hash = new_object_class(top_level_class, hash)
       object = klass.new
 
+      #puts "klass = #{klass.inspect}"
       #puts "object = #{object.inspect}"
       #puts "hash keys = #{hash.keys}"
       #puts "association keys = #{klass.associations.keys}"
 
-      association_keys = hash.keys & klass.associations.keys
+      association_keys = klass.associations.keys
+      hash.each do |key, value|
+        if association_keys.include?(key)
+          if value.is_a?(Array)
+            value = new_objects_from_array(value, klass.associations[key].klass)
+          else
+            value = new_from_hash(value)
+          end
+        end
+
+        object.write_value(key, value)
+      end
+
+=begin
+      association_keys = hash.keys.map(&:to_s) & klass.associations.keys.map(&:to_s)
       association_keys.each do |key|
         attributes = hash.delete(key)
         if attributes.is_a?(Array)
@@ -570,6 +585,7 @@ module ActiveRecord
       end
 
       object.attributes = hash
+=end
 
       return object
     end
@@ -579,11 +595,11 @@ module ActiveRecord
 
       # attempt to extract the class name from the top level hash
       if !klass && hash.keys.size == 1
-        class_name = hash.keys.first
+        class_name = hash.keys.first.to_s
         hash = hash.values.first
 
         # convert to uppercase name
-        class_name = class_name[0..0].upcase + class_name[1..-2]
+        class_name = class_name[0..0].upcase + class_name[1..-1]
         klass = Object.const_get(class_name) 
       end
 
@@ -660,7 +676,7 @@ module ActiveRecord
 
     def initialize(initializers={})
       @attributes = {}
-      @associations = {}
+      @association_values = {}
       @observers = {}
       initializers.each do |initializer, value|
         @attributes[initializer.to_s] = value
@@ -712,25 +728,55 @@ module ActiveRecord
       self.attributes[attribute_name.to_s]
     end
 
+    def write_association_value(assoc, values_or_value)
+      if assoc.association_type == :has_many
+        if self.id
+          values_or_value.each do |object|
+            if object.read_attribute(assoc.foreign_key) != self.id
+              object.write_attribute(assoc.foreign_key, self.id)
+              object.save
+            end
+          end
+        else
+          @association_values[assoc.name] = values_or_value
+        end
+      else
+        @association_values[assoc.name] = values_or_value
+      end
+    end
+
+    def read_association_value(assoc)
+      if assoc.association_type == :has_many
+        @association_values[assoc.name] || []
+      else
+        @association_values[assoc.name]
+      end
+    end
+
+    def clear_association_value(assoc)
+      @association_values.delete(assoc.name)
+    end
+
     def write_value(name, new_value)
       assoc = self.class.associations[name]
       if assoc 
         if self.id 
           if assoc.association_type == :has_many
-            new_value.each do |value|
-              value.write_attribute("#{table_name.singularize}_id", self.id)
-              value.save
-            end
+            write_association_value(assoc, new_value)
+            #new_value.each do |value|
+            #  value.write_attribute("#{table_name.singularize}_id", self.id)
+            #  value.save
+            #end
           elsif assoc.association_type == :belongs_to
             if new_value.id
-              write_attribute("#{new_value.table_name}_id", new_value.id)
+              write_attribute(assoc.foreign_key, new_value.id)
 
             else
-              write_attribute(name, new_value)
+              write_association_value(assoc, new_value)
             end
           end
         else
-          write_attribute(name, new_value)
+          write_association_value(assoc, new_value)
         end
       else
         write_attribute(name, new_value)
@@ -745,13 +791,13 @@ module ActiveRecord
           if self.id
             CollectionProxy.new(connection, self, assoc)
           else
-            read_attribute(name) || []
+            read_association_value(assoc)
           end
         elsif assoc.association_type == :belongs_to
           if self.id
-            Relation.new(connection, assoc.klass, assoc.table_name).where("id" => read_attribute("#{assoc.table_name}_id")).first
+            Relation.new(connection, assoc.klass, assoc.table_name).where("id" => read_attribute(assoc.foreign_key)).first
           else
-            read_attribute(name)
+            read_association_value(assoc)
           end
         end
       else
@@ -762,20 +808,20 @@ module ActiveRecord
     def save
       debug "save: memory(before) = #{connection}"
       debug "save: self(before): #{self}"
-      self.class.associations.to_a.select do |name_and_assoc|
-        name = name_and_assoc[0]
-        assoc = name_and_assoc[1]
-        assoc.association_type == :belongs_to
-      end.each do |name_and_assoc|
-        name = name_and_assoc[0]
-        assoc = name_and_assoc[1]
-        debug "name = #{name}, #{assoc}"
-        debug "value = #{read_attribute(name).inspect}"
-        belongs_to_value =  read_attribute(name)
-        if belongs_to_value 
-          debug "save: has belongs_to_value: id(#{belongs_to_value.id}), #{belongs_to_value.attributes}"
-          belongs_to_value.save unless belongs_to_value.id
-          @attributes["#{name}_id"] = belongs_to_value.id
+      self.class.associations.each do |name, assoc|
+        value = read_association_value(assoc)
+        debug "save: association(#{name}) value: #{value.inspect}"
+        if value
+          if assoc.association_type == :has_many
+            value.each do |object|
+              object.save
+            end
+          else
+            debug "save: has belongs_to_value: id(#{value.id}), #{value.attributes}"
+            value.save unless value.id
+            write_attribute(assoc.foreign_key, value.id)
+          end
+          clear_association_value(assoc)
         end
       end 
 
