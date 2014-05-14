@@ -10,6 +10,21 @@ class String
   def camelize
     self.split(/_/).map{|word| word.capitalize}.join
   end
+
+  def underscore
+  end
+
+  def blank?
+    nil || self == ""
+  end
+
+  def present?
+    !blank?
+  end
+
+  def presence
+    self if present?
+  end
 end
 
 def debug(str)
@@ -531,6 +546,19 @@ module ActiveRecord
     end
   end
 
+  class Name
+    attr_reader :singular, :plural, :element, :collection,
+      :singular_route_key, :route_key, :param_key, :i18n_key,
+      :name
+    
+    def initialize(klass)
+      @singular = klass.to_s
+      @singular = @singular[0..0].downcase + @singular[1..-1]
+      @plural = @singular + "s"
+      @param_key = @singular
+    end
+  end
+
   class Base
     attr_accessor :attributes, :observers
 
@@ -553,6 +581,10 @@ module ActiveRecord
       array.map do |attributes|
         new_from_hash(attributes, top_level_class)
       end.flatten
+    end
+
+    def self.model_name
+      Name.new(self)
     end
 
     def self.new_from_hash(hash, top_level_class=nil)
