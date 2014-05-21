@@ -12,7 +12,7 @@ else
     puts "running with MRI"
     require_relative '../opal/active_record/core'
     # uncomment only when running  in MRI
-    # require 'json'
+    require 'json'
   end
 end
 

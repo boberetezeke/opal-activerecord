@@ -12,6 +12,10 @@ class String
   end
 
   def underscore
+    `#{self}.replace(/([A-Z\d]+)([A-Z][a-z])/g, '$1_$2')
+    .replace(/([a-z\d])([A-Z])/g, '$1_$2')
+    .replace(/-/g, '_')
+    .toLowerCase()`
   end
 
   def blank?
@@ -27,8 +31,10 @@ class String
   end
 end
 
+$debug_on = false
+
 def debug(str)
-  #puts(str) #if $debug_on
+  puts(str) if $debug_on
 end
 
 module Arel
@@ -187,14 +193,25 @@ module ActiveRecord
       end
     end
 
+    def where(*args)
+      relation.where(*args)
+    end
+
     def method_missing(sym, *args, &block)
-      if [:first, :last, :all, :load, :reverse].include?(sym)
-        where_clause = "#{@owner.table_name.singularize}_id"
-        debug "#{sym}: for table: #{@association.table_name}, where: #{where_clause} == #{@owner.id}"
-        Relation.new(@connection, @association.klass, @association.table_name).where(where_clause => @owner.id).send(sym)
+      if [:first, :last, :all, :load, :reverse, :empty?].include?(sym)
+        debug "CollectionProxy: method_missing: #{sym}"
+        relation.send(sym, *args, &block)
       else
         super
       end
+    end
+
+    private
+
+    def relation
+        where_clause = "#{@owner.table_name.singularize}_id"
+        debug "CollectionProxy: relation: for table: #{@association.table_name}, where: #{where_clause} == #{@owner.id}"
+        Relation.new(@connection, @association.klass, @association.table_name).where(where_clause => @owner.id)
     end
   end
 
@@ -249,6 +266,14 @@ module ActiveRecord
 
     def [](index)
       execute[index]
+    end
+
+    def empty?
+      execute.empty?
+    end
+
+    def map(&block)
+      execute.map(block)
     end
 
     def all
@@ -560,7 +585,7 @@ module ActiveRecord
   end
 
   class Base
-    attr_accessor :attributes, :observers
+    attr_accessor :attributes, :association_values, :observers
 
     def self.new_objects_from_json(json, top_level_class=nil)
       # if its a hash
@@ -578,6 +603,7 @@ module ActiveRecord
     end
 
     def self.new_objects_from_array(array, top_level_class=nil)
+      #puts "new_objects_from_array(#{top_level_class}): #{array}"
       array.map do |attributes|
         new_from_hash(attributes, top_level_class)
       end.flatten
@@ -601,11 +627,14 @@ module ActiveRecord
       association_keys = klass.associations.keys
       hash.each do |key, value|
         if association_keys.include?(key)
+          association_class = klass.associations[key].klass
           if value.is_a?(Array)
-            value = new_objects_from_array(value, klass.associations[key].klass)
+            value = new_objects_from_array(value, association_class)
           else
-            value = new_from_hash(value)
+            value = new_from_hash(value, association_class)
           end
+        else
+          #puts "#{key} not in association_keys = #{association_keys}"
         end
 
         object.write_value(key, value)
@@ -625,19 +654,19 @@ module ActiveRecord
       object.attributes = hash
 =end
 
+      #puts "Constructed Object: #{object}"
       return object
     end
 
     def self.new_object_class(top_level_class, hash)
       klass = top_level_class
-
       # attempt to extract the class name from the top level hash
       if !klass && hash.keys.size == 1
         class_name = hash.keys.first.to_s
         hash = hash.values.first
 
         # convert to uppercase name
-        class_name = class_name[0..0].upcase + class_name[1..-1]
+        class_name = class_name.camelize
         klass = Object.const_get(class_name) 
       end
 
@@ -668,7 +697,7 @@ module ActiveRecord
     end
     
     def self.table_name
-      self.to_s.downcase + "s"
+      self.to_s.underscore.pluralize
     end
 
     def self.find(id)
@@ -717,7 +746,7 @@ module ActiveRecord
       @association_values = {}
       @observers = {}
       initializers.each do |initializer, value|
-        @attributes[initializer.to_s] = value
+        write_value(initializer.to_s, value)
       end
     end
 
@@ -767,6 +796,7 @@ module ActiveRecord
     end
 
     def write_association_value(assoc, values_or_value)
+      debug "write_association_value: #{assoc}, #{values_or_value}"
       if assoc.association_type == :has_many
         if self.id
           values_or_value.each do |object|
@@ -782,6 +812,7 @@ module ActiveRecord
     end
 
     def read_association_value(assoc)
+      debug "read_association_value: #{assoc}, #{@association_values}"
       if assoc.association_type == :has_many
         @association_values[assoc.name] || []
       else
@@ -794,17 +825,18 @@ module ActiveRecord
     end
 
     def write_value(name, new_value)
+      debug "write_value: name: #{name}, new_value: #{new_value}"
       assoc = self.class.associations[name]
       if assoc 
         if self.id 
           if assoc.association_type == :has_many
             write_association_value(assoc, new_value)
           elsif assoc.association_type == :belongs_to
-            if new_value.id
-              write_attribute(assoc.foreign_key, new_value.id)
-            else
+            #if new_value.id
+            #  write_attribute(assoc.foreign_key, new_value.id)
+            #else
               write_association_value(assoc, new_value)
-            end
+            #end
           end
         else
           write_association_value(assoc, new_value)
@@ -816,6 +848,8 @@ module ActiveRecord
 
     def read_value(name)
       debug "Base#read_value, name = #{name}, self.class.associations = #{self.class.associations.inspect}"
+      assoc = self.class.associations[name]
+      debug "Base#read_value: assoc = #{assoc}"
       if assoc = self.class.associations[name]
         val = (assoc.association_type == :has_many)
         if assoc.association_type == :has_many
@@ -826,8 +860,11 @@ module ActiveRecord
           end
         elsif assoc.association_type == :belongs_to
           if self.id
+            debug "Base#read_value: belongs_to (id = #{self.id})"
+            debug "Base#read_value: belongs_to: getting from relation: 'id' = #{read_attribute(assoc.foreign_key)}"
             Relation.new(connection, assoc.klass, assoc.table_name).where("id" => read_attribute(assoc.foreign_key)).first
           else
+            debug "Base#read_value: belongs_to: reading from association_value"
             read_association_value(assoc)
           end
         end
@@ -845,11 +882,12 @@ module ActiveRecord
         if value
           if assoc.association_type == :has_many
             value.each do |object|
+              debug "save: has has_many_value: id(#{object.id}), #{object.attributes}"
               object.save
             end
           else
-            debug "save: has belongs_to_value: id(#{value.id}), #{value.attributes}"
-            value.save unless value.id
+            debug "save: has belongs_to_value: id(#{value.id}), #{value}"
+            value.save #unless value.id
             write_attribute(assoc.foreign_key, value.id)
           end
           clear_association_value(assoc)
