@@ -57,8 +57,46 @@ module Arel
     end
   end
 
+  class Table
+    def initialize(table_name)
+      @table_name = table_name
+    end
+
+    def [](column_name)
+      # FIXME: need to integrate table name into symbols
+      Arel::Nodes::Symbol.new(column_name)
+    end
+  end
+
   module Nodes
-    class BinaryOp
+    class Base
+      def eq(node_or_value)
+        Equality.new(self, convert_to_node(node_or_value))
+      end
+
+      def ne(node_or_value)
+        NotEqual.new(self, convert_to_node(node_or_value))
+      end
+
+      def and(node_or_value)
+        And.new(self, convert_to_node(node_or_value))
+      end
+
+      def or(node_or_value)
+        Or.new(self, convert_to_node(node_or_value))
+      end
+
+      def convert_to_node(node_or_value)
+        if node_or_value.is_a?(Base)
+          return node_or_value
+        else
+          # assume it is a literal
+          return Literal.new(node_or_value)
+        end
+      end
+    end
+
+    class BinaryOp < Base
       attr_reader :left_node, :right_node
       def initialize(left_node, right_node)
         @left_node = left_node
@@ -94,7 +132,7 @@ module Arel
       end
     end
 
-    class Literal
+    class Literal < Base
       def initialize(value)
         @value = value
       end
@@ -108,7 +146,7 @@ module Arel
       end
     end
 
-    class Symbol
+    class Symbol < Base
       def initialize(symbol)
         @symbol = symbol
       end
@@ -225,12 +263,16 @@ module ActiveRecord
     end
 
     def where(query)
-      key, value = query.first
-      node = eq_node(key, value)
-      if query.keys.size > 1
-        query.to_a[1..-1].each do |key, value|
-          node = Arel::Nodes::And.new(node, eq_node(key, value))
+      if query.is_a?(Hash)
+        key, value = query.first
+        node = eq_node(key, value)
+        if query.keys.size > 1
+          query.to_a[1..-1].each do |key, value|
+            node = Arel::Nodes::And.new(node, eq_node(key, value))
+          end
         end
+      else
+        
       end
 
       @select_manager.where(node)
@@ -252,6 +294,11 @@ module ActiveRecord
       self
     end
 
+    def includes(sym)
+      # FIXME: implement includes if needed
+      self
+    end
+
     def first
       execute.first
     end
@@ -270,10 +317,6 @@ module ActiveRecord
 
     def empty?
       execute.empty?
-    end
-
-    def map(&block)
-      execute.map(block)
     end
 
     def all
@@ -696,6 +739,10 @@ module ActiveRecord
       @associations[name.to_s] = Association.new(self, :belongs_to, name, options, @connection)
     end
     
+    def self.arel_table
+      Arel::Table.new(table_name)
+    end
+
     def self.table_name
       self.to_s.underscore.pluralize
     end
@@ -730,7 +777,7 @@ module ActiveRecord
     end
 
     def self.method_missing(sym, *args)
-      if [:first, :last, :all, :where].include?(sym)
+      if [:first, :last, :all, :where, :includes].include?(sym)
         Relation.new(connection, self, table_name).send(sym, *args)
       else
         super
