@@ -808,6 +808,8 @@ module ActiveRecord
       end
     end
 
+    # FIXME: should we raise exception if attribute name is not association or defined column?
+    #        currently don't keep track of valid columns per table
     def method_missing(sym, *args)
       method_name = sym.to_s
       debug "Base#method_missing: #{method_name}, #{attributes}"
@@ -960,6 +962,10 @@ module ActiveRecord
       end
 
       debug "save: memory(after) = #{connection.to_s}"
+    end
+
+    def persisted?
+      read_attribute(:id) != nil
     end
 
     def destroy
