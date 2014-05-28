@@ -166,9 +166,7 @@ describe "ActiveRecord::Base" do
 
       context "when contructing an object with a has_many that contains embedded objects that also have many objects" do
         it "should create the first object and the has_many objects" do
-          $debug_on = true
           b = B.new_from_hash({'x' => 1, 'y' => 2, 'cs' => [{'s' => 3, 't' => 4, 'ds' => [{'m' => 5, 'n' => 6}]}]})
-          $debug_on = false
           expect(b.x).to eq(1)
           expect(b.y).to eq(2)
           expect(b.cs.size).to eq(1)
