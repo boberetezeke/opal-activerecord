@@ -39,6 +39,10 @@ class MockLocalStorage
   def delete(name)
     @storage.delete(name)
   end
+
+  def to_s
+    @storage.inspect
+  end
 end
 
 describe "ActiveRecord::Base" do
