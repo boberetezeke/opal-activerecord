@@ -36,7 +36,7 @@ class MockLocalStorage
     @storage[name]
   end
 
-  def delete(name)
+  def remove(name)
     @storage.delete(name)
   end
 
@@ -253,6 +253,46 @@ describe "ActiveRecord::Base" do
         end
       end
     end
+
+    context "when updating local id's with remote id's" do
+      let(:a) { A.new(x:1) }
+
+      before do
+        a.save
+      end
+
+      it "should update the id in storage" do
+        old_id = a.id
+        new_id = old_id + 100
+
+        a.update_id(new_id)
+
+        expect{A.find(old_id)}.to raise_error(ActiveRecord::RecordNotFound)
+        expect(A.find(new_id)).to eq(a)
+      end
+      
+    end
+
+    context "when observers are present" do
+      let(:a) { A.new(x:1) }
+
+      before do
+        @changes = []
+        a.on_change(:x) do |old_value, new_value|
+          @changes.push([old_value, new_value])
+        end
+      end
+
+      it "should update its observer when changes are made" do
+        a.x = 2
+        expect(@changes).to eq([[1, 2]])
+      end
+
+      it "should not update its observer if an update to an identical value is made" do
+        a.x = 1
+        expect(@changes).to eq([])
+      end
+    end
   end
 
   context "when using an active record model with no associations" do
@@ -420,6 +460,13 @@ describe "ActiveRecord::Base" do
     context "when the has many side is saved only" do
       before do
         b.save
+      end
+
+      context "when checking for b on unsaved c" do
+        it "retrieves b" do
+          c.b_id = b.id
+          expect(c.b).to eq(b)
+        end
       end
 
       context "when setting cs" do

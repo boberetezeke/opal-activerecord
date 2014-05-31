@@ -429,7 +429,7 @@ module ActiveRecord
       end
 
       def delete_record_attributes(id)
-        @local_storage.delete(table_record_name(id))
+        @local_storage.remove(table_record_name(id))
         @index.delete(id)
       end
 
@@ -496,13 +496,19 @@ module ActiveRecord
     end
 
     def find(klass, table_name, id)
-      klass.new(get_table(table_name).get_record_attributes(id))
+      record_attributes = get_table(table_name).get_record_attributes(id)
+      if record_attributes
+        klass.new(record_attributes)
+      else
+        raise ActiveRecord::RecordNotFound.new
+      end
     end
 
     def create(klass, table_name, record)
       debug "LocalStorageStore#create: #{table_name}, #{record}"
       table = get_table(table_name)
       next_id = table.generate_next_id
+      record.attributes['id'] = next_id
       table.put_record_attributes(next_id, record.attributes)
       @change_callback.call(:insert, record) if @change_callback
       return next_id
@@ -517,6 +523,16 @@ module ActiveRecord
       end
       debug "LocalStorageStore#update: putting to #{record.id}, #{record.attributes}"
       table.put_record_attributes(record.id, record.attributes)
+    end
+
+    def update_id(klass, table_name, old_id, new_id)
+      debug "LocalStorageStore#update_id: #{table_name}, #{old_id} to #{new_id}"
+      
+      table = get_table(table_name)
+      record_attributes = table.get_record_attributes(old_id)
+      table.delete_record_attributes(old_id)
+      record_attributes['id'] = new_id
+      table.put_record_attributes(new_id, record_attributes)
     end
 
     def destroy(klass, table_name, record)
@@ -604,6 +620,13 @@ module ActiveRecord
       table[record.id] = record
     end
 
+    def update_id(klass, table_name, old_id, new_id)
+      table = @tables[table_name]
+      record = table.delete(old_id)
+      record[:id] = new_id
+      table[new_id] = record
+    end
+
     def destroy(klass, table_name, record)
       @change_callback.call(:delete, record) if @change_callback
       @tables[table_name].delete(record.id)
@@ -638,9 +661,10 @@ module ActiveRecord
     end
   end
 
-  class Base
-    attr_accessor :attributes, :association_values, :observers
+  class RecordNotFound < Exception
+  end
 
+  class Base
     def self.new_objects_from_json(json, top_level_class=nil)
       # if its a hash
       if /^\s*{/.match(json)
@@ -799,6 +823,8 @@ module ActiveRecord
       super(*args)
     end
 
+    attr_accessor :attributes, :association_values, :observers
+
     def initialize(initializers={})
       @attributes = {}
       @association_values = {}
@@ -813,13 +839,23 @@ module ActiveRecord
     def method_missing(sym, *args)
       method_name = sym.to_s
       debug "Base#method_missing: #{method_name}, #{attributes}"
-      if m = /(.*)=$/.match(method_name)
-        val = write_value(m[1], args.shift)
-      else
-        val = read_value(method_name)
+      if m = /(.*)=$/.match(method_name) 
+        if args.size == 1
+          val = args.shift
+          attribute_name = m[1]
+          write_value(attribute_name, val)
+          debug "Base#method_missing (at end), write #{attribute_name} = #{val}"
+          return 
+        end
+      else 
+        if args.size == 0
+          val = read_value(method_name)
+          debug "Base#method_missing (at end), val = #{val}"
+          return val
+        end
       end
-      debug "Base#method_missing (at end), val = #{val}"
-      val
+
+      super
     end
 
     # stolen from ActiveRecord:core.rb
@@ -844,9 +880,11 @@ module ActiveRecord
       old_value = self.attributes[attribute_name]
       self.attributes[attribute_name] = new_value
 
-      if self.observers[attribute_name] then
-        self.observers[attribute_name].each do |observer|
-          observer.call(old_value, new_value)
+      if old_value != new_value
+        if self.observers[attribute_name] then
+          self.observers[attribute_name].each do |observer|
+            observer.call(old_value, new_value)
+          end
         end
       end
     end
@@ -919,7 +957,7 @@ module ActiveRecord
             read_association_value(assoc)
           end
         elsif assoc.association_type == :belongs_to
-          if self.id
+          if read_attribute(assoc.foreign_key)
             debug "Base#read_value: belongs_to (id = #{self.id})"
             debug "Base#read_value: belongs_to: getting from relation: 'id' = #{read_attribute(assoc.foreign_key)}"
             Relation.new(connection, assoc.klass, assoc.table_name).where("id" => read_attribute(assoc.foreign_key)).first
@@ -962,6 +1000,10 @@ module ActiveRecord
       end
 
       debug "save: memory(after) = #{connection.to_s}"
+    end
+
+    def update_id(new_id)
+      connection.update_id(self.class, table_name, self.id, new_id)
     end
 
     def persisted?
