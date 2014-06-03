@@ -368,7 +368,9 @@ module ActiveRecord
       @observers.push(Observer.new(call_back, select_manager)) 
     end
 
-    def notify_observers(change, object)
+    def notify_observers(change, object, options={})
+      return if options[:from_remote]
+
       @observers.each do |observer|
         if observer.select_manager
           if record_matches(object, observer.select_manager)
@@ -537,24 +539,24 @@ module ActiveRecord
       end
     end
 
-    def create(klass, table_name, record)
+    def create(klass, table_name, record, options={})
       debug "LocalStorageStore#create: #{table_name}, #{record}"
       table = get_table(table_name)
       next_id = table.generate_next_id
       record.attributes['id'] = next_id
       table.put_record_attributes(next_id, record.attributes)
-      notify_observers(:insert, record)
+      notify_observers(:insert, record, options)
       return next_id
     end
 
-    def update(klass, table_name, record)
+    def update(klass, table_name, record, options={})
       debug "LocalStorageStore#update: #{table_name}, #{record}"
       table = get_table(table_name)
       old_record_attributes = table.get_record_attributes(record.id)
       if old_record_attributes
-        notify_observers(:update, record) if record.attributes != old_record_attributes 
+        notify_observers(:update, record, options) if record.attributes != old_record_attributes 
       else
-        notify_observers(:insert, record)
+        notify_observers(:insert, record, options)
       end
       debug "LocalStorageStore#update: putting to #{record.id}, #{record.attributes}"
       table.put_record_attributes(record.id, record.attributes)
@@ -570,10 +572,10 @@ module ActiveRecord
       table.put_record_attributes(new_id, record_attributes)
     end
 
-    def destroy(klass, table_name, record)
+    def destroy(klass, table_name, record, options={})
+      notify_observers(:delete, record, options)
       table = get_table(table_name)
       table.delete_record_attributes(record.id)
-      notify_observers(:delete, record)
     end
 
 
@@ -633,34 +635,34 @@ module ActiveRecord
       record
     end
 
-    def create(klass, table_name, record)
+    def create(klass, table_name, record, options)
       debug "MemoryStore#Create(#{record})"
       init_new_table(table_name)
       next_id = gen_next_id(table_name)
       @tables[table_name][next_id] = record
-      notify_observers(:insert, record)
+      notify_observers(:insert, record, options)
       return next_id
     end
 
-    def update(klass, table_name, record)
+    def update(klass, table_name, record, options={})
       init_new_table(table_name)
       table = @tables[table_name]
       old_attributes = table[record.id]
       if old_attributes
-        notify_observers(:update, record) if record.attributes != table[record.id]
+        notify_observers(:update, record, options) if record.attributes != table[record.id]
       end
       table[record.id] = record
     end
 
-    def update_id(klass, table_name, old_id, new_id)
+    def update_id(klass, table_name, old_id, new_id, options={})
       table = @tables[table_name]
       record = table.delete(old_id)
       record[:id] = new_id
       table[new_id] = record
     end
 
-    def destroy(klass, table_name, record)
-      notify_observers(:delete, record)
+    def destroy(klass, table_name, record, options={})
+      notify_observers(:delete, record, options)
       @tables[table_name].delete(record.id)
     end
 
@@ -845,8 +847,14 @@ module ActiveRecord
     end
 
     def self.create(*args)
+      if args.size > 1 && args.last.is_a?(Hash)
+        options = args.pop
+      else
+        options = {}
+      end
+
       obj = self.new(*args)
-      obj.save
+      obj.save(options)
       obj
     end
 
@@ -1010,18 +1018,18 @@ module ActiveRecord
       end
     end
 
-    def update(attributes)
+    def update(attributes, options={})
       attributes.each do |key, value|
         write_value(key, value)
       end
-      self.save
+      self.save(options)
     end
 
-    def destroy
-      connection.destroy(self.class, table_name, self)
+    def destroy(options={})
+      connection.destroy(self.class, table_name, self, options)
     end
 
-    def save
+    def save(options={})
       debug "save: memory(before) = #{connection}"
       debug "save: self(before): #{self}"
       self.class.associations.each do |name, assoc|
@@ -1044,9 +1052,9 @@ module ActiveRecord
 
       debug "save: self(after): #{self}"
       if self.id
-        connection.update(self.class, table_name, self)
+        connection.update(self.class, table_name, self, options)
       else
-        @attributes['id'] = connection.create(self.class, table_name, self)
+        @attributes['id'] = connection.create(self.class, table_name, self, options)
       end
 
       debug "save: memory(after) = #{connection.to_s}"
@@ -1058,10 +1066,6 @@ module ActiveRecord
 
     def persisted?
       read_attribute(:id) != nil
-    end
-
-    def destroy
-      connection.destroy(self.class, table_name, self)
     end
 
     def id

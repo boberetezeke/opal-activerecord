@@ -299,9 +299,9 @@ describe "ActiveRecord::Base" do
     end
 
     context "when relation observers are present" do
-      let(:a1) { A.create(x:1) }
-      let(:a2) { A.create(x:2) }
-      let(:a3) { A.new(x:3) }
+      let!(:a1) { A.create(x:1) }
+      let!(:a2) { A.create(x:2) }
+      let!(:a3) { A.new(x:3) }
 
       before do
         @changes = []
@@ -310,29 +310,68 @@ describe "ActiveRecord::Base" do
         end
       end
 
-      it "should notify the observer when a new object is saved" do
-        a3.save
-        expect(@changes).to eq([[:insert, a3]])
+      context "updates are from a remote source" do
+        it "should notify the observer when a new object is saved" do
+          a3.save
+          expect(@changes).to eq([[:insert, a3]])
+        end
+
+        it "should notify the observer when an object is modified" do
+          a2.x = 4
+          a2.save
+          expect(@changes).to eq([[:update, a2]])
+        end
+
+        it "should notify the observer when an object is deleted" do
+          a1.destroy
+          expect(@changes).to eq([[:delete, a1]])
+        end
+
+        it "should notify the observer with changes to several objects" do
+          a1.x = 10
+          a1.save
+          a2.update(x:20)
+          a2.destroy
+          a3.save
+          expect(@changes).to eq([[:update, a1], [:update, a2], [:delete, a2], [:insert, a3]])
+        end
+
+        it "should notify the observer with changes on a create" do
+          a = A.create(x: 1)
+          expect(@changes).to eq([[:insert, a]])
+        end
       end
 
-      it "should notify the observer when an object is modified" do
-        a2.x = 4
-        a2.save
-        expect(@changes).to eq([[:insert, a2], [:update, a2]])
-      end
+      context "updates are from a remote source" do
+        before do
+          @changes = []
+        end
 
-      it "should notify the observer when an object is deleted" do
-        a1.destroy
-        expect(@changes).to eq([[:insert, a1], [:delete, a1]])
-      end
+        it "shouldn't notify an observer if its an insert" do
+          A.new(x:5).save(from_remote: true)
+          expect(@changes).to eq([])
+        end
 
-      it "should notify the observer with changes to several objects" do
-        a1.x = 10
-        a1.save
-        a2.update(x:20)
-        a2.destroy
-        a3.save
-        expect(@changes).to eq([[:insert, a1], [:update, a1], [:insert, a2], [:update, a2], [:delete, a2], [:insert, a3]])
+        it "shouldn't notify an observer if its an update" do
+          a1.x = 3
+          a1.save(from_remote: true)
+          expect(@changes).to eq([])
+        end
+
+        it "shouldn't notify an observer if its an update" do
+          a1.update({x: 2}, from_remote: true)
+          expect(@changes).to eq([])
+        end
+
+        it "shouldn't notify an observer if its a destroy" do
+          a1.destroy(from_remote: true)
+          expect(@changes).to eq([])
+        end
+
+        it "shouldn't notify the observer with changes on a create" do
+          a = A.create({x: 1}, from_remote: true)
+          expect(@changes).to eq([])
+        end
       end
     end
   end
