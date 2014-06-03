@@ -66,6 +66,10 @@ module Arel
     def execute
       @connection.execute(self)
     end
+
+    def on_change(block)
+      @connection.on_change_with_select_manager(block, self)
+    end
   end
 
   class Table
@@ -283,7 +287,7 @@ module ActiveRecord
           end
         end
       else
-        
+        # FIXME: handle Arel nodes
       end
 
       @select_manager.where(node)
@@ -342,11 +346,43 @@ module ActiveRecord
     def eq_node(key, value)
       Arel::Nodes::Equality.new(Arel::Nodes::Symbol.new(key), Arel::Nodes::Literal.new(value))
     end
+
+    def on_change(block)
+      @select_manager.on_change(block)
+      return self
+    end
   end
 
   class AbstractStore
+    class Observer < Struct.new(:call_back, :select_manager); end
+
+    def initialize(*args)
+      @observers = []
+    end
+
     def on_change(&call_back)
-      @change_callback = call_back
+      @observers.push(Observer.new(call_back, nil))
+    end
+
+    def on_change_with_select_manager(call_back, select_manager)
+      @observers.push(Observer.new(call_back, select_manager)) 
+    end
+
+    def notify_observers(change, object)
+      @observers.each do |observer|
+        if observer.select_manager
+          if record_matches(object, observer.select_manager)
+            observer.call_back.call(change, object)
+          end
+        else
+          observer.call_back.call(change, object)
+        end
+      end
+    end
+
+    def record_matches(record, select_manager)
+      debug "LocalStorageStore#execute: node: #{select_manager.node}, checking record: #{record}"
+      select_manager.node ?  select_manager.node.value(record) : true
     end
   end
 
@@ -470,6 +506,8 @@ module ActiveRecord
     # table_name:index - an array of record ids stored for that table
     #
     def initialize(browser_local_storage)
+      super
+
       @local_storage = browser_local_storage
       @tables = {}
     end
@@ -479,12 +517,7 @@ module ActiveRecord
       records = table.get_all_record_attributes.map do |attributes|
         select_manager.klass.new(attributes) 
       end.select do |record|
-        if select_manager.node
-          debug "LocalStorageStore#execute: node: #{select_manager.node}, checking record: #{record}"
-          select_manager.node.value(record)
-        else
-          true
-        end
+        record_matches(record, select_manager)
       end
       debug "LocalStorageStore#execute: result = #{records.inspect}"
       records
@@ -510,7 +543,7 @@ module ActiveRecord
       next_id = table.generate_next_id
       record.attributes['id'] = next_id
       table.put_record_attributes(next_id, record.attributes)
-      @change_callback.call(:insert, record) if @change_callback
+      notify_observers(:insert, record)
       return next_id
     end
 
@@ -519,7 +552,9 @@ module ActiveRecord
       table = get_table(table_name)
       old_record_attributes = table.get_record_attributes(record.id)
       if old_record_attributes
-        @change_callback.call(:update, record) if @change_callback && record.attributes != old_record_attributes 
+        notify_observers(:update, record) if record.attributes != old_record_attributes 
+      else
+        notify_observers(:insert, record)
       end
       debug "LocalStorageStore#update: putting to #{record.id}, #{record.attributes}"
       table.put_record_attributes(record.id, record.attributes)
@@ -538,7 +573,7 @@ module ActiveRecord
     def destroy(klass, table_name, record)
       table = get_table(table_name)
       table.delete_record_attributes(record.id)
-      @change_callback.call(:delete, record) if @change_callback
+      notify_observers(:delete, record)
     end
 
 
@@ -565,6 +600,8 @@ module ActiveRecord
     attr_reader :tables
 
     def initialize
+      super
+
       @tables = {}
       @next_ids = {}
     end
@@ -574,12 +611,7 @@ module ActiveRecord
       debug "MemoryStore#execute: tables = #{@tables.keys}"
       debug "MemoryStore#node = #{select_manager.node}"
       records = @tables[select_manager.table_name.to_s].values.select do |record|
-        if select_manager.node
-          debug "MemoryStore#execute: checking record: #{record}"
-          select_manager.node.value(record)
-        else
-          true
-        end
+        record_matches(record, select_manager)
       end
       debug "MemoryStore#execute: result = #{records.inspect}"
       records
@@ -606,7 +638,7 @@ module ActiveRecord
       init_new_table(table_name)
       next_id = gen_next_id(table_name)
       @tables[table_name][next_id] = record
-      @change_callback.call(:insert, record) if @change_callback
+      notify_observers(:insert, record)
       return next_id
     end
 
@@ -615,7 +647,7 @@ module ActiveRecord
       table = @tables[table_name]
       old_attributes = table[record.id]
       if old_attributes
-        @change_callback.call(:update, record) if @change_callback && record.attributes != table[record.id]
+        notify_observers(:update, record) if record.attributes != table[record.id]
       end
       table[record.id] = record
     end
@@ -628,7 +660,7 @@ module ActiveRecord
     end
 
     def destroy(klass, table_name, record)
-      @change_callback.call(:delete, record) if @change_callback
+      notify_observers(:delete, record)
       @tables[table_name].delete(record.id)
     end
 
@@ -786,6 +818,13 @@ module ActiveRecord
       connection.find(self, table_name, id)
     end
 
+    #
+    # create a relation on change call and return the relation
+    #
+    def self.on_change(&block)
+      Relation.new(connection, self, table_name).on_change(block)
+    end
+
     def self.associations
       @associations || {}
     end
@@ -807,7 +846,7 @@ module ActiveRecord
 
     def self.create(*args)
       obj = self.new(*args)
-      #obj.save
+      obj.save
       obj
     end
 
@@ -971,6 +1010,17 @@ module ActiveRecord
       end
     end
 
+    def update(attributes)
+      attributes.each do |key, value|
+        write_value(key, value)
+      end
+      self.save
+    end
+
+    def destroy
+      connection.destroy(self.class, table_name, self)
+    end
+
     def save
       debug "save: memory(before) = #{connection}"
       debug "save: self(before): #{self}"
@@ -1011,7 +1061,7 @@ module ActiveRecord
     end
 
     def destroy
-      @connection.destroy(self.class, table_name, self)
+      connection.destroy(self.class, table_name, self)
     end
 
     def id

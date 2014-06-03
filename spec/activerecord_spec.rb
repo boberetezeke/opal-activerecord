@@ -29,7 +29,11 @@ class MockLocalStorage
   end
 
   def set(name, value)
-    @storage[name] = value
+    if value.is_a?(Hash) || value.is_a?(Array)
+      @storage[name] = value.dup
+    else
+      @storage[name] = value
+    end
   end
 
   def get(name)
@@ -268,12 +272,12 @@ describe "ActiveRecord::Base" do
         a.update_id(new_id)
 
         expect{A.find(old_id)}.to raise_error(ActiveRecord::RecordNotFound)
-        expect(A.find(new_id)).to eq(a)
+        expect(A.find(new_id).id).to eq(new_id)
       end
       
     end
 
-    context "when observers are present" do
+    context "when object observers are present" do
       let(:a) { A.new(x:1) }
 
       before do
@@ -293,11 +297,43 @@ describe "ActiveRecord::Base" do
         expect(@changes).to eq([])
       end
     end
-  end
 
-  context "when using an active record model with no associations" do
-    it "should be true" do
-      expect(nil).to eq(nil)
+    context "when relation observers are present" do
+      let(:a1) { A.create(x:1) }
+      let(:a2) { A.create(x:2) }
+      let(:a3) { A.new(x:3) }
+
+      before do
+        @changes = []
+        A.on_change do |action, object|
+          @changes.push([action, object])
+        end
+      end
+
+      it "should notify the observer when a new object is saved" do
+        a3.save
+        expect(@changes).to eq([[:insert, a3]])
+      end
+
+      it "should notify the observer when an object is modified" do
+        a2.x = 4
+        a2.save
+        expect(@changes).to eq([[:insert, a2], [:update, a2]])
+      end
+
+      it "should notify the observer when an object is deleted" do
+        a1.destroy
+        expect(@changes).to eq([[:insert, a1], [:delete, a1]])
+      end
+
+      it "should notify the observer with changes to several objects" do
+        a1.x = 10
+        a1.save
+        a2.update(x:20)
+        a2.destroy
+        a3.save
+        expect(@changes).to eq([[:insert, a1], [:update, a1], [:insert, a2], [:update, a2], [:delete, a2], [:insert, a3]])
+      end
     end
   end
 
@@ -538,6 +574,23 @@ describe "ActiveRecord::Base" do
         c.save
         expect(c.b).to eq(b)
       end
+    end
+  end
+
+  describe "#update" do
+    it "updates and saves a new record" do
+      A.new(x: 1, y: 2).update(x: 4)
+      expect(A.first.x).to eq(4)
+      expect(A.first.y).to eq(2)
+    end
+
+    it "updates a record on disk" do
+      a = A.new(x: 1, y: 2)
+      a.save
+      a.update(x: 3)
+
+      expect(A.first.x).to eq(3)
+      expect(A.first.y).to eq(2)
     end
   end
 end
