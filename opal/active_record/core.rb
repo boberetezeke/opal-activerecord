@@ -539,7 +539,7 @@ module ActiveRecord
       if record_attributes
         klass.new(record_attributes)
       else
-        raise ActiveRecord::RecordNotFound.new
+        raise ActiveRecord::RecordNotFound.new("Record not found: class #{klass}, id #{id}")
       end
     end
 
