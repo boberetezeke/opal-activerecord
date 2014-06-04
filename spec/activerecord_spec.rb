@@ -303,14 +303,14 @@ describe "ActiveRecord::Base" do
       let!(:a2) { A.create(x:2) }
       let!(:a3) { A.new(x:3) }
 
-      before do
-        @changes = []
-        A.on_change do |action, object|
-          @changes.push([action, object])
+      context "updates are from a remote source and we want all changes" do
+        before do
+          @changes = []
+          A.on_change do |action, object|
+            @changes.push([action, object])
+          end
         end
-      end
 
-      context "updates are from a remote source" do
         it "should notify the observer when a new object is saved" do
           a3.save
           expect(@changes).to eq([[:insert, a3]])
@@ -345,6 +345,9 @@ describe "ActiveRecord::Base" do
       context "updates are from a remote source" do
         before do
           @changes = []
+          A.on_change(local_only: true) do |action, object|
+            @changes.push([action, object])
+          end
         end
 
         it "shouldn't notify an observer if its an insert" do

@@ -67,8 +67,8 @@ module Arel
       @connection.execute(self)
     end
 
-    def on_change(block)
-      @connection.on_change_with_select_manager(block, self)
+    def on_change(block, options={})
+      @connection.on_change_with_select_manager(block, self, options)
     end
   end
 
@@ -347,31 +347,35 @@ module ActiveRecord
       Arel::Nodes::Equality.new(Arel::Nodes::Symbol.new(key), Arel::Nodes::Literal.new(value))
     end
 
-    def on_change(block)
-      @select_manager.on_change(block)
+    def on_change(block, options={})
+      @select_manager.on_change(block, options)
       return self
     end
   end
 
   class AbstractStore
-    class Observer < Struct.new(:call_back, :select_manager); end
+    class Observer < Struct.new(:call_back, :select_manager, :options); end
 
     def initialize(*args)
       @observers = []
     end
 
-    def on_change(&call_back)
-      @observers.push(Observer.new(call_back, nil))
+    def on_change(options={}, &call_back)
+      @observers.push(Observer.new(call_back, nil, options))
     end
 
-    def on_change_with_select_manager(call_back, select_manager)
-      @observers.push(Observer.new(call_back, select_manager)) 
+    def on_change_with_select_manager(call_back, select_manager, options={})
+      @observers.push(Observer.new(call_back, select_manager, options)) 
     end
 
     def notify_observers(change, object, options={})
-      return if options[:from_remote]
-
+      debug "notify_observers: change = #{change}, object = #{object}, options = #{options}"
       @observers.each do |observer|
+        debug "observer.options = #{observer.options}"
+        next if options[:from_remote] &&     observer.options[:local_only]
+        next if !(options[:from_remote]) &&  observer.options[:remote_only]
+        debug "notifying observers!!"
+
         if observer.select_manager
           if record_matches(object, observer.select_manager)
             observer.call_back.call(change, object)
@@ -553,13 +557,14 @@ module ActiveRecord
       debug "LocalStorageStore#update: #{table_name}, #{record}"
       table = get_table(table_name)
       old_record_attributes = table.get_record_attributes(record.id)
+      old_record_attributes = old_record_attributes.dup if old_record_attributes
+      table.put_record_attributes(record.id, record.attributes)
       if old_record_attributes
         notify_observers(:update, record, options) if record.attributes != old_record_attributes 
       else
         notify_observers(:insert, record, options)
       end
       debug "LocalStorageStore#update: putting to #{record.id}, #{record.attributes}"
-      table.put_record_attributes(record.id, record.attributes)
     end
 
     def update_id(klass, table_name, old_id, new_id)
@@ -699,25 +704,25 @@ module ActiveRecord
   end
 
   class Base
-    def self.new_objects_from_json(json, top_level_class=nil)
+    def self.new_objects_from_json(json, top_level_class=nil, options={})
       # if its a hash
       if /^\s*{/.match(json)
-        return new_objects_from_hash(JSON.parse(json), top_level_class)
+        return new_objects_from_hash(JSON.parse(json), top_level_class, options)
       elsif /^\s*\[/.match(json)
-        return new_objects_from_array(JSON.parse(json), top_level_class)
+        return new_objects_from_array(JSON.parse(json), top_level_class, options)
       else
         raise "Unsupported JSON format (neither a hash or array)"
       end
     end
 
-    def self.new_objects_from_hash(hash, top_level_class=nil)
-      [new_from_hash(hash, top_level_class)]
+    def self.new_objects_from_hash(hash, top_level_class=nil, options={})
+      [new_from_hash(hash, top_level_class, options)]
     end
 
-    def self.new_objects_from_array(array, top_level_class=nil)
+    def self.new_objects_from_array(array, top_level_class=nil, options={})
       #puts "new_objects_from_array(#{top_level_class}): #{array}"
       array.map do |attributes|
-        new_from_hash(attributes, top_level_class)
+        new_from_hash(attributes, top_level_class, options)
       end.flatten
     end
 
@@ -725,7 +730,7 @@ module ActiveRecord
       Name.new(self)
     end
 
-    def self.new_from_hash(hash, top_level_class=nil)
+    def self.new_from_hash(hash, top_level_class=nil, options={})
       #puts "new_from_hash=#{hash}, top_level_class=#{top_level_class}"
 
       klass, hash = new_object_class(top_level_class, hash)
@@ -741,15 +746,15 @@ module ActiveRecord
         if association_keys.include?(key)
           association_class = klass.associations[key].klass
           if value.is_a?(Array)
-            value = new_objects_from_array(value, association_class)
+            value = new_objects_from_array(value, association_class, options)
           else
-            value = new_from_hash(value, association_class)
+            value = new_from_hash(value, association_class, options)
           end
         else
           #puts "#{key} not in association_keys = #{association_keys}"
         end
 
-        object.write_value(key, value)
+        object.write_value(key, value, options)
       end
 
 =begin
@@ -823,8 +828,8 @@ module ActiveRecord
     #
     # create a relation on change call and return the relation
     #
-    def self.on_change(&block)
-      Relation.new(connection, self, table_name).on_change(block)
+    def self.on_change(options={}, &block)
+      Relation.new(connection, self, table_name).on_change(block, options)
     end
 
     def self.associations
@@ -872,12 +877,12 @@ module ActiveRecord
 
     attr_accessor :attributes, :association_values, :observers
 
-    def initialize(initializers={})
+    def initialize(initializers={}, options={})
       @attributes = {}
       @association_values = {}
       @observers = {}
       initializers.each do |initializer, value|
-        write_value(initializer.to_s, value)
+        write_value(initializer.to_s, value, options)
       end
     end
 
@@ -940,13 +945,15 @@ module ActiveRecord
       self.attributes[attribute_name.to_s]
     end
 
-    def write_association_value(assoc, values_or_value)
-      debug "write_association_value: #{assoc}, #{values_or_value}"
+    def write_association_value(assoc, values_or_value, options={})
+      debug "write_association_value: #{assoc}, #{values_or_value}, options = #{options}"
       if assoc.association_type == :has_many
         if self.id
           values_or_value.each do |object|
-            object.write_attribute(assoc.foreign_key, self.id)
-            object.save
+            if object.read_attribute(assoc.foreign_key) != self.id
+              object.write_attribute(assoc.foreign_key, self.id)
+              object.save(options)
+            end
           end
         else
           @association_values[assoc.name] = values_or_value
@@ -969,22 +976,22 @@ module ActiveRecord
       @association_values.delete(assoc.name)
     end
 
-    def write_value(name, new_value)
-      debug "write_value: name: #{name}, new_value: #{new_value}"
+    def write_value(name, new_value, options={})
+      debug "write_value: name: #{name}, new_value: #{new_value}, options=#{options}"
       assoc = self.class.associations[name]
       if assoc 
         if self.id 
           if assoc.association_type == :has_many
-            write_association_value(assoc, new_value)
+            write_association_value(assoc, new_value, options)
           elsif assoc.association_type == :belongs_to
             #if new_value.id
             #  write_attribute(assoc.foreign_key, new_value.id)
             #else
-              write_association_value(assoc, new_value)
+              write_association_value(assoc, new_value, options)
             #end
           end
         else
-          write_association_value(assoc, new_value)
+          write_association_value(assoc, new_value, options)
         end
       else
         write_attribute(name, new_value)
@@ -1039,11 +1046,12 @@ module ActiveRecord
           if assoc.association_type == :has_many
             value.each do |object|
               debug "save: has has_many_value: id(#{object.id}), #{object.attributes}"
-              object.save
+              object.save(options)
             end
           else
             debug "save: has belongs_to_value: id(#{value.id}), #{value}"
-            value.save #unless value.id
+            # FIXME: this should not be a forced save
+            value.save(options) #unless value.id
             write_attribute(assoc.foreign_key, value.id)
           end
           clear_association_value(assoc)
