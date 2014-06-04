@@ -950,10 +950,10 @@ module ActiveRecord
       if assoc.association_type == :has_many
         if self.id
           values_or_value.each do |object|
-            if object.read_attribute(assoc.foreign_key) != self.id
+            #if object.read_attribute(assoc.foreign_key) != self.id
               object.write_attribute(assoc.foreign_key, self.id)
               object.save(options)
-            end
+            #end
           end
         else
           @association_values[assoc.name] = values_or_value
