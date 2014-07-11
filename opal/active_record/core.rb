@@ -254,6 +254,8 @@ module ActiveRecord
       if [:first, :last, :all, :load, :reverse, :empty?].include?(sym)
         debug "CollectionProxy: method_missing: #{sym}"
         relation.send(sym, *args, &block)
+      elsif @association.klass.scopes[sym]
+        @association.klass.scopes[sym].call
       else
         super
       end
@@ -262,9 +264,9 @@ module ActiveRecord
     private
 
     def relation
-        where_clause = "#{@owner.table_name.singularize}_id"
-        debug "CollectionProxy: relation: for table: #{@association.table_name}, where: #{where_clause} == #{@owner.id}"
-        Relation.new(@connection, @association.klass, @association.table_name).where(where_clause => @owner.id)
+      where_clause = "#{@owner.table_name.singularize}_id"
+      debug "CollectionProxy: relation: for table: #{@association.table_name}, where: #{where_clause} == #{@owner.id}"
+      Relation.new(@connection, @association.klass, @association.table_name).where(where_clause => @owner.id)
     end
   end
 
@@ -311,6 +313,11 @@ module ActiveRecord
 
     def includes(sym)
       # FIXME: implement includes if needed
+      self
+    end
+
+    def references(sym)
+      # FIXME: implement references if needed
       self
     end
 
@@ -796,11 +803,25 @@ module ActiveRecord
     end
 
     def self.default_scope(*args)
-      # FIXME: Implement
+      if args.size == 1 && args.first.is_a?(Proc)
+        @default_scope = args.first
+      end
     end
 
     def self.scope(*args)
-      # FIXME: Implement
+      @scopes ||= {}
+
+      if args.size == 2 && args[0].is_a?(Symbol) && args[1].is_a?(Proc)
+        scope_name, method_body  = args
+        @scopes[scope_name] = method_body
+        self.scopes
+      else
+        raise "scope requires name and lambda as arguments"
+      end
+    end
+
+    def self.scopes
+      @scopes || {}
     end
 
     def self.has_many(name, options={})
@@ -866,6 +887,8 @@ module ActiveRecord
     def self.method_missing(sym, *args)
       if [:first, :last, :all, :where, :includes].include?(sym)
         Relation.new(connection, self, table_name).send(sym, *args)
+      elsif @scopes[sym]
+        @scopes[sym].call
       else
         super
       end
