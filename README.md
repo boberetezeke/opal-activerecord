@@ -38,6 +38,8 @@ run that:
 
 * run_with_real_active_record=true rspec spec
 
+## Supported Subset of ActiveRecord/ActiveModel
+
 ## Contributing
 
 1. Fork it
