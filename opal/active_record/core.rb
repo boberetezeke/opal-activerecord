@@ -2,7 +2,7 @@
 $debug_on = false
 
 def debug(str)
-  puts(str) if $debug_on
+  #puts(str) if $debug_on
 end
 
 module ActiveRecord
@@ -39,10 +39,10 @@ module ActiveRecord
     end
 
     def self.new_objects_from_array(array, top_level_class=nil, options={})
-      puts "new_objects_from_array: array size #{array.size}"
-      puts "new_objects_from_array(#{top_level_class}): #{array}"
+      debug "new_objects_from_array: array size #{array.size}"
+      debug "new_objects_from_array(#{top_level_class}): #{array}"
       array.map do |attributes|
-        puts "attributes=#{attributes}"
+        debug "attributes=#{attributes}"
         new_from_hash(attributes, top_level_class, options)
       end.flatten
     end
@@ -52,15 +52,15 @@ module ActiveRecord
     end
 
     def self.new_from_hash(hash, top_level_class=nil, options={})
-      puts "new_from_hash=#{hash}, top_level_class=#{top_level_class}"
+      debug "new_from_hash=#{hash}, top_level_class=#{top_level_class}"
 
       klass, hash = new_object_class(top_level_class, hash)
       object = klass.new
 
-      puts "klass = #{klass.inspect}"
-      puts "object = #{object.inspect}"
-      puts "hash keys = #{hash.keys}"
-      puts "association keys = #{klass.associations.keys}"
+      debug "klass = #{klass.inspect}"
+      debug "object = #{object.inspect}"
+      debug "hash keys = #{hash.keys}"
+      debug "association keys = #{klass.associations.keys}"
 
       association_keys = klass.associations.keys
       hash.each do |key, value|
@@ -72,7 +72,7 @@ module ActiveRecord
             value = new_from_hash(value, association_class, options)
           end
         else
-          puts "#{key} not in association_keys = #{association_keys}"
+          debug "#{key} not in association_keys = #{association_keys}"
         end
 
         object.write_value(key, value, options)
@@ -92,19 +92,19 @@ module ActiveRecord
       object.attributes = hash
 =end
 
-      puts "Constructed Object: #{object}"
+      debug "Constructed Object: #{object}"
       return object
     end
 
     def self.new_object_class(top_level_class, hash)
-      puts "new_object_class, hash.keys: #{hash.size}"
+      debug "new_object_class, hash.keys: #{hash.size}"
       klass = top_level_class
       # attempt to extract the class name from the top level hash
       if !klass && hash.keys.size == 1
         class_name = hash.keys.first.to_s
         hash = hash.values.first
-        puts "class_name = #{class_name}"
-        puts "hash = #{hash}"
+        debug "class_name = #{class_name}"
+        debug "hash = #{hash}"
 
         # convert to uppercase name
         class_name = class_name.camelize
