@@ -10,6 +10,15 @@ else
     require 'opal-activerecord'
   else
     puts "running with MRI"
+    require_relative '../opal/active_record/core_ext/string'
+    require_relative '../opal/active_record/local_storage'
+    require_relative '../opal/active_record/store/abstract_store'
+    require_relative '../opal/active_record/store/local_storage_store'
+    require_relative '../opal/active_record/store/memory_store'
+    require_relative '../opal/active_record/association'
+    require_relative '../opal/active_record/collection_proxy'
+    require_relative '../opal/active_record/relation'
+    require_relative '../opal/active_record/arel'
     require_relative '../opal/active_record/core'
     # uncomment only when running  in MRI
     require 'json'
