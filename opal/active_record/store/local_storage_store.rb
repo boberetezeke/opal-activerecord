@@ -127,11 +127,21 @@ module ActiveRecord
 
     def execute(select_manager)
       table = get_table(select_manager.table_name)
-      records = table.get_all_record_attributes.map do |attributes|
-        select_manager.klass.new(attributes) 
-      end.select do |record|
-        record_matches(record, select_manager)
+      table = table.get_all_record_attributes.map  { |attributes| {select_manager.table_name => attributes} }
+      select_manager.joins.each do |join|
+        join.join_spec.each do |association_from, association_to|
+          table_name = association_from.table_name
+          table_2 = get_table(table_name).get_all_record_attributes.map  { |attributes| {table_name => attributes} }
+          table = join_tables(table, table_2, select_manager.table_name, 'id', table_name, association_from.foreign_key.to_s)
+
+          if association_to
+            table_name = association_to.table_name
+            table_2 = get_table(table_name).get_all_record_attributes.map  { |attributes| {table_name => attributes} }
+            table = join_tables(table, table_2, association_from.table_name, association_to.foreign_key.to_s, table_name, 'id')
+          end
+        end
       end
+      records = filter(table, select_manager ).map { |record| select_manager.klass.new(record[select_manager.table_name]) }
       debug "LocalStorageStore#execute: result = #{records.inspect}"
       records
     end

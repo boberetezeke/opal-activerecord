@@ -25,6 +25,32 @@ else
   end
 end
 
+class MockLocalStorage
+  attr_reader :storage
+  def initialize
+    @storage = {}
+  end
+
+  def set(name, value)
+    if value.is_a?(Hash) || value.is_a?(Array)
+      @storage[name] = value.dup
+    else
+      @storage[name] = value
+    end
+  end
+
+  def get(name)
+    @storage[name]
+  end
+
+  def remove(name)
+    @storage.delete(name)
+  end
+
+  def to_s
+    @storage.inspect
+  end
+end
 
 module TestUnitHelpers
   def assert_equal actual, expected

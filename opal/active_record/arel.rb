@@ -1,20 +1,42 @@
 module Arel
   class SelectManager
-    attr_accessor :ordering, :limit, :offset
+    attr_accessor :ordering, :limit, :offset, :joins
     attr_accessor :klass, :table_name, :node
 
     def initialize(connection, klass, table_name)
       @connection = connection
       @klass = klass
       @table_name = table_name
+      @joins = []
     end
 
     def where(node)
-      @node = node
+      # if there is a node already, just and it in
+      if @node
+        @node =  Arel::Nodes::And.new(node, @node)
+      else
+        @node = node
+      end
     end
 
     def execute
       @connection.execute(self)
+    end
+
+   def filter(records)
+      records = select(records)
+      records = ordering.sort(records) if ordering
+      records = offset.offset(records) if offset
+      records = limit.limit(records)   if limit
+      records
+    end
+
+    def select(records)
+      records.select {|record| record_matches(record) }
+    end
+
+    def record_matches(record)
+      !node || node.value(record)
     end
 
     def on_change(block, options={})
@@ -29,7 +51,7 @@ module Arel
 
     def [](column_name)
       # FIXME: need to integrate table name into symbols
-      Arel::Nodes::Symbol.new(column_name)
+      Arel::Nodes::Symbol.new(@table_name, column_name)
     end
   end
 
@@ -112,23 +134,62 @@ module Arel
     end
 
     class Symbol < Base
-      def initialize(symbol)
+      def initialize(table_name, symbol)
+        @table_name = table_name
         @symbol = symbol
       end
 
       def value(record)
-        record.send(@symbol)
+        record[@table_name][@symbol.to_s]
       end
 
       def to_s
-        "Symbol: #{@symbol}"
+        "Symbol: #{@table_name}::#{@symbol}"
       end
     end
 
     class Ordering
-      attr_reader :order_str
+      attr_reader :order_str, :orders
       def initialize(order_str)
         @order_str = order_str
+        @orders = @order_str.split(/,/).map{|order| order.strip}.map{|str| Order.new(str)}
+      end
+
+      def execute(records)
+        records.sort do |record1, record2|
+          @orders.each do |order|
+            val1 = record1.send(order.field_name)
+            val2 = record2.send(order.field_name)
+
+            break if val1 != val2
+          end
+
+          val1 <=> val2
+        end
+      end
+
+      class Order
+        ASCENDING = :ascending
+        DESCENDING = :descending
+
+        attr_reader :field_name, :direction
+        def initialize(str)
+          m = /^(\w+)(\s+(asc|desc|ASC|DESC))?$/.match(str)
+          if m
+            @field_name = m[1]
+            if m[2]
+              if m[3] == 'asc' || m[3] == 'ASC'
+                @direction = ASCENDING
+              else
+                @direction = DESCENDING
+              end
+            else
+              @direction = ASCENDING
+            end
+          else
+            raise "invalid order str #{str}"
+          end
+        end
       end
     end
 
@@ -136,6 +197,13 @@ module Arel
       attr_reader :limit
       def initialize(limit)
         @limit = limit
+      end
+    end
+
+    class Join
+      attr_reader :join_spec
+      def initialize(join_spec)
+        @join_spec = join_spec
       end
     end
   end

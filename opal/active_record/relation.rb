@@ -18,7 +18,7 @@ module ActiveRecord
           end
         end
       else
-        # FIXME: handle Arel nodes
+        node = query
       end
 
       @select_manager.where(node)
@@ -37,6 +37,22 @@ module ActiveRecord
 
     def offset(index)
       @select_manager.offset = Arel::Nodes::Offset.new(index)
+      self
+    end
+
+    def joins(join_spec)
+      if join_spec.is_a?(Hash)
+        association_join_spec = {}
+        join_spec.each do |from_association_name, to_association_name|
+          from_association = @select_manager.klass.associations[from_association_name.to_s]
+          raise "single level hashes only allowed" unless to_association_name.is_a?(Symbol) || to_association_name.is_a?(String)
+          to_association = from_association.klass.associations[to_association_name.to_s]
+          association_join_spec[from_association] = to_association
+        end
+      else
+        association_join_spec = { @select_manager.klass.associations[join_spec.to_s] => nil }
+      end
+      @select_manager.joins.push(Arel::Nodes::Join.new(association_join_spec))
       self
     end
 
@@ -84,7 +100,7 @@ module ActiveRecord
     end
 
     def eq_node(key, value)
-      Arel::Nodes::Equality.new(Arel::Nodes::Symbol.new(key), Arel::Nodes::Literal.new(value))
+      Arel::Nodes::Equality.new(Arel::Nodes::Symbol.new(@select_manager.table_name, key), Arel::Nodes::Literal.new(value))
     end
 
     def on_change(block, options={})

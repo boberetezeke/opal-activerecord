@@ -10,6 +10,7 @@ end
 class C < ActiveRecord::Base
   belongs_to :b
   has_many :ds
+  has_many :es, through: :ds
 end
 
 class D < ActiveRecord::Base
@@ -20,33 +21,6 @@ end
 class E < ActiveRecord::Base
   has_many :ds
   has_many :cs, :through => :ds
-end
-
-class MockLocalStorage
-  attr_reader :storage
-  def initialize
-    @storage = {}
-  end
-
-  def set(name, value)
-    if value.is_a?(Hash) || value.is_a?(Array)
-      @storage[name] = value.dup
-    else
-      @storage[name] = value
-    end
-  end
-
-  def get(name)
-    @storage[name]
-  end
-
-  def remove(name)
-    @storage.delete(name)
-  end
-
-  def to_s
-    @storage.inspect
-  end
 end
 
 describe "ActiveRecord::Base" do
@@ -465,9 +439,13 @@ describe "ActiveRecord::Base" do
 
   context "when using an active record models with has_many/belongs_to associations" do
     let(:b)  { B.new(x:1) }
-    let(:c)  { C.new(y:1) }
-    let(:c2) { C.new(y:2) }
+    let(:c)  { C.new(x:1, y:1) }
+    let(:c2) { C.new(x:2, y:1) }
     let(:d)  { D.new(x:1, y:1) }
+    let(:d2) { D.new(x:2, y:2) }
+    let(:d3) { D.new(x:2, y:3) }
+    let(:e)  { E.new(x:1) }
+    let(:e2) { E.new(x:2) }
 
     context "when the objects are not yet saved" do
 
@@ -596,6 +574,7 @@ describe "ActiveRecord::Base" do
       before do
         b.save
         c.save
+        d.save
       end
 
       it "has a B object with [] for the C association" do
@@ -615,6 +594,65 @@ describe "ActiveRecord::Base" do
         c.b = b
         c.save
         expect(c.b).to eq(b)
+      end
+
+      context "when using joins" do
+        before do
+          c.save
+          c2.save
+          e.save
+          e2.save
+
+          d.c = c
+          d.e = e
+          d.save
+          d2.c = c
+          d2.e = e2
+          d2.save
+          d3.c = c2
+          d3.e = e
+          d3.save
+        end
+
+        it "joins one table to retrieve some records" do
+          cs = C.where(y: 1).joins(:ds).where(D.arel_table[:e_id].eq(e.id)).all
+          expect(cs).to match_array([c, c2])
+        end
+
+        it "joins two tables to retrieve some records" do
+          cs = C.where(y: 1).joins(:ds => :e).where(E.arel_table[:x].eq(1)).all
+          expect(cs).to match_array([c, c2])
+        end
+      end
+
+      context "when doing has_many :through through a join table" do
+        before do
+          d.c = c
+          d.e = e
+          d.save
+        end
+
+        it "retreives the has_many :through association" do
+          expect(d.c).to eq(c)
+          expect(d.e).to eq(e)
+          expect(c.es.load).to eq([e])
+          expect(e.cs.load).to eq([c])
+        end
+      end
+
+      context "when doing has_many :through :through" do
+        before do
+          c.b = b
+          c.save
+          d.c = c
+          d.save
+        end
+
+        it "retreives the has_many :through association" do
+          expect(b.cs.load).to eq([c])
+          expect(c.ds.load).to eq([d])
+          expect(b.ds).to eq([d])
+        end
       end
     end
   end
