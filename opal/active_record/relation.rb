@@ -46,6 +46,7 @@ module ActiveRecord
         join_spec.each do |from_association_name, to_association_name|
           from_association = @select_manager.klass.associations[from_association_name.to_s]
           raise "single level hashes only allowed" unless to_association_name.is_a?(Symbol) || to_association_name.is_a?(String)
+
           to_association = from_association.klass.associations[to_association_name.to_s]
           association_join_spec[from_association] = to_association
         end
