@@ -1,12 +1,13 @@
 module ActiveRecord
   class Association
-    attr_reader :foreign_key, :association_type, :name
+    attr_reader :foreign_key, :association_type, :name, :source_klass, :options
 
     def initialize(source_klass, association_type, name, options, connection)
       @association_type = association_type
       @name = name
       @options = options
       @connection = connection
+      @source_klass = source_klass
       if @association_type == :belongs_to
         @foreign_key =  "#{name}_id"
       elsif @association_type == :has_many
@@ -32,7 +33,7 @@ module ActiveRecord
     end
 
     def to_s
-      "#Association: #{@name}: #{@association_type}"
+      "#Association: #{@source_klass} #{@association_type}: #{@name}"
     end
 
     def hash
