@@ -132,12 +132,20 @@ module ActiveRecord
         join.join_spec.each do |association_from, association_to|
           table_name = association_from.table_name
           table_2 = get_table(table_name).get_all_record_attributes.map  { |attributes| {table_name => attributes} }
-          table = join_tables(table, table_2, select_manager.table_name, 'id', table_name, association_from.foreign_key.to_s)
+          if association_from.association_type == :has_many
+            table = join_tables(table, table_2, select_manager.table_name, 'id', table_name, association_from.foreign_key.to_s)
+          else
+            table = join_tables(table, table_2, select_manager.table_name, association_from.foreign_key.to_s, table_name, 'id')
+          end
 
           if association_to
             table_name = association_to.table_name
             table_2 = get_table(table_name).get_all_record_attributes.map  { |attributes| {table_name => attributes} }
-            table = join_tables(table, table_2, association_from.table_name, association_to.foreign_key.to_s, table_name, 'id')
+            if association_to.association_type == :has_many
+              table = join_tables(table, table_2, association_from.table_name, 'id', table_name, association_to.foreign_key.to_s)
+            else
+              table = join_tables(table, table_2, association_from.table_name, association_to.foreign_key.to_s, table_name, 'id')
+            end
           end
         end
       end

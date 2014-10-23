@@ -5,6 +5,7 @@ end
 
 class B < ActiveRecord::Base
   has_many :cs
+  has_many :ds, through: :cs
 end
 
 class C < ActiveRecord::Base
@@ -20,7 +21,7 @@ end
 
 class E < ActiveRecord::Base
   has_many :ds
-  has_many :cs, :through => :ds
+  has_many :cs, through: :ds
 end
 
 describe "ActiveRecord::Base" do
@@ -651,7 +652,7 @@ describe "ActiveRecord::Base" do
         it "retreives the has_many :through association" do
           expect(b.cs.load).to eq([c])
           expect(c.ds.load).to eq([d])
-          expect(b.ds).to eq([d])
+          expect(b.ds.load).to eq([d])
         end
       end
     end
