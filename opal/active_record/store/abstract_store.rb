@@ -129,7 +129,9 @@ module ActiveRecord
     def join_tables(table1,  table2, table1_name, table1_column, table2_name, table2_column)
       table_joiner = TableJoiner.new(table1, table2, table1_name, table1_column, table2_name, table2_column)
       table_joiner.join
-      table_joiner.result_table
+      result_table = table_joiner.result_table
+      # puts "result_table = #{result_table}"
+      result_table
     end
   end
 end
