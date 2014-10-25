@@ -639,6 +639,13 @@ describe "ActiveRecord::Base" do
           expect(c.es.load).to eq([e])
           expect(e.cs.load).to eq([c])
         end
+
+
+        it "creates a join table entry when adding to a has_many :through association" do
+          e1 = E.new(x:3, y: 3)
+          c.es << e1
+          expect(c.es.load).to eq([e, e1])
+        end
       end
 
       context "when doing has_many :through :through" do
