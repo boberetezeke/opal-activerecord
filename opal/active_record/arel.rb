@@ -25,7 +25,7 @@ module Arel
 
    def filter(records)
       records = select(records)
-      records = ordering.sort(records) if ordering
+      records = ordering.execute(records) if ordering
       records = offset.offset(records) if offset
       records = limit.limit(records)   if limit
       records
@@ -149,22 +149,30 @@ module Arel
     end
 
     class Ordering
-      attr_reader :order_str, :orders
-      def initialize(order_str)
+      attr_reader :table_name, :order_str, :orders
+      def initialize(table_name, order_str)
         @order_str = order_str
-        @orders = @order_str.split(/,/).map{|order| order.strip}.map{|str| Order.new(str)}
+        @table_name = table_name
+        @orders = @order_str.split(/,/).map{|order| order.strip}.map{|str| Order.new(table_name, str)}
       end
 
       def execute(records)
         records.sort do |record1, record2|
+          val1 = val2 = nil
+          non_matching_order = nil
           @orders.each do |order|
-            val1 = record1.send(order.field_name)
-            val2 = record2.send(order.field_name)
+            non_matching_order = order
+            val1 = record1[order.table_name][order.field_name.to_s]
+            val2 = record2[order.table_name][order.field_name.to_s]
 
             break if val1 != val2
           end
 
-          val1 <=> val2
+          if non_matching_order.descending?
+            val2 <=> val1
+          else
+            val1 <=> val2
+          end
         end
       end
 
@@ -172,10 +180,11 @@ module Arel
         ASCENDING = :ascending
         DESCENDING = :descending
 
-        attr_reader :field_name, :direction
-        def initialize(str)
+        attr_reader :table_name, :field_name, :direction
+        def initialize(table_name, str)
           m = /^(\w+)(\s+(asc|desc|ASC|DESC))?$/.match(str)
           if m
+            @table_name = table_name
             @field_name = m[1]
             if m[2]
               if m[3] == 'asc' || m[3] == 'ASC'
@@ -189,6 +198,14 @@ module Arel
           else
             raise "invalid order str #{str}"
           end
+        end
+
+        def ascending?
+          @direction == ASCENDING
+        end
+
+        def descending?
+          @direction == DESCENDING
         end
       end
     end
