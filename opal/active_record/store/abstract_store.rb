@@ -70,6 +70,7 @@ module ActiveRecord
 
       attr_reader :result_table
       def initialize(table1, table2, table1_name, table1_column, table2_name, table2_column)
+        debug "TableJoiner#initialize: join where #{table1_name}.#{table1_column} == #{table2_name}.#{table2_column}"
         @table1 = table1.sort_by{|row| row[table1_name][table1_column]}
         @table2 = table2.sort_by{|row| row[table2_name][table2_column]}
 

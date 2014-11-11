@@ -73,7 +73,9 @@ module ActiveRecord
         if destination_to_through_association.association_type == :has_many
           Relation.new(@connection, destination_klass, destination_klass.table_name).
               joins(through_klass.table_name => source_klass.table_name.singularize).
-              where(through_klass.arel_table[through_to_source_association.foreign_key].eq(source_klass.arel_table[:id]))
+              where(through_klass.arel_table[destination_to_through_association.foreign_key].eq(destination_klass.arel_table[:id]).
+                and(through_klass.arel_table[through_to_source_association.foreign_key].eq(@owner.id))
+              )
         else
           Relation.new(@connection, destination_klass, destination_klass.table_name).
               joins(through_klass.table_name.singularize => source_klass.table_name.singularize).

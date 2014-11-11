@@ -11,6 +11,7 @@ module Arel
     end
 
     def where(node)
+      debug "SelectManager#where: node: #{node}, existing @node = #{@node}"
       # if there is a node already, just and it in
       if @node
         @node =  Arel::Nodes::And.new(node, @node)
@@ -36,7 +37,15 @@ module Arel
     end
 
     def record_matches(record)
-      !node || node.value(record)
+      result = !node || node.value(record)
+
+      if node
+        debug("SelectManager#record_matches: #{result} = #{record} match with #{node}")
+      else
+        debug("SelectManager#record_matches: #{result} = nil node")
+      end
+
+      result
     end
 
     def on_change(block, options={})
@@ -99,11 +108,19 @@ module Arel
       def value(record)
         @left_node.value(record) && @right_node.value(record)
       end
+
+      def to_s
+        "#{@left_node} && #{@right_node}"
+      end
     end
 
     class Or < BinaryOp
       def value(record)
         @left_node.value(record) || @right_node.value(record)
+      end
+
+      def to_s
+        "#{@left_node} || #{@right_node}"
       end
     end
 
@@ -111,11 +128,19 @@ module Arel
       def value(record)
         @left_node.value(record) == @right_node.value(record)
       end
+
+      def to_s
+        "#{@left_node} == #{@right_node}"
+      end
     end
 
     class NotEqual < BinaryOp
       def value(record)
         @left_node.value(record) != @right_node.value(record)
+      end
+
+      def to_s
+        "#{@left_node} != #{@right_node}"
       end
     end
 
