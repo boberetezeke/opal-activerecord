@@ -119,6 +119,24 @@ module ActiveRecord
     def self.accepts_nested_attributes_for(*args)
     end
 
+    # stubs for validation routines
+    def self.validates_presence_of(*args); end
+    def self.validates!(*args); end
+    def self.validates_each(*args); end
+    def self.validates_with(*args); end
+    def self.validates_size_of(*args); end
+    def self.validates_format_of(*args); end
+    def self.validates_length_of(*args); end
+    def self.validates_absence_of(*args); end
+    def self.validates_associated(*args); end
+    def self.validates_exclusion_of(*args); end
+    def self.validates_inclusion_of(*args); end
+    def self.validates_acceptance_of(*args); end
+    def self.validates_uniqueness_of(*args); end
+    def self.validates_confirmation_of(*args); end
+    def self.validates_numericality_of(*args); end
+    def self.validate(*args); end
+
     def self.default_scope(*args)
       if args.size == 1 && args.first.is_a?(Proc)
         @default_scope = args.first
