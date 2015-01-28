@@ -220,7 +220,7 @@ module ActiveRecord
     end
 
     def self.method_missing(sym, *args)
-      if [:first, :last, :all, :where, :includes].include?(sym)
+      if [:first, :last, :all, :where, :includes, :order].include?(sym)
         Relation.new(connection, self, table_name).send(sym, *args)
       elsif @scopes[sym]
         @scopes[sym].call

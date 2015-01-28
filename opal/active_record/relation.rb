@@ -67,38 +67,24 @@ module ActiveRecord
       self
     end
 
-    def first
-      execute.first
-    end
-
-    def last
-      execute.last
-    end
-
-    def reverse
-      execute.reverse
-    end
-
-    def [](index)
-      execute[index]
-    end
-
-    def empty?
-      execute.empty?
+    def method_missing(sym, *args, &block)
+      if LAZY_METHODS.include?(sym)
+        execute.send(sym, *args, &block)
+      end
     end
 
     def present?
       execute.present?
     end
 
+    def empty?
+      execute.empty?
+    end
+
     def all
       execute
     end
     alias load all
-
-    def each
-      execute.each { |record| yield record }
-    end
 
     def eq_node(key, value)
       Arel::Nodes::Equality.new(Arel::Nodes::Symbol.new(@select_manager.table_name, key), Arel::Nodes::Literal.new(value))

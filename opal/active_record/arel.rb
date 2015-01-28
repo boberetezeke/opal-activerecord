@@ -37,12 +37,18 @@ module Arel
     end
 
     def record_matches(record)
+      if node
+        #puts("SelectManager#record_matches: match with #{node}")
+      else
+        #puts("SelectManager#record_matches: match with nil node")
+      end
+
       result = !node || node.value(record)
 
       if node
-        debug("SelectManager#record_matches: #{result} = #{record} match with #{node}")
+        #puts("SelectManager#record_matches: #{result} = #{record}")
       else
-        debug("SelectManager#record_matches: #{result} = nil node")
+        #puts("SelectManager#record_matches: #{result} = nil node")
       end
 
       result
@@ -80,6 +86,10 @@ module Arel
 
       def or(node_or_value)
         Or.new(self, convert_to_node(node_or_value))
+      end
+
+      def in(node_or_value)
+        In.new(self, convert_to_node(node_or_value))
       end
 
       def convert_to_node(node_or_value)
@@ -121,6 +131,16 @@ module Arel
 
       def to_s
         "#{@left_node} || #{@right_node}"
+      end
+    end
+
+    class In < BinaryOp
+      def value(record)
+        @right_node.value(record).include?(@left_node.value(record))
+      end
+
+      def to_s
+        "#{@left_node} in #{@right_node}"
       end
     end
 
@@ -168,6 +188,14 @@ module Arel
         record[@table_name][@symbol.to_s]
       end
 
+      def asc
+        @direction = :asc
+      end
+
+      def desc
+        @direction = :desc
+      end
+
       def to_s
         "Symbol: #{@table_name}::#{@symbol}"
       end
@@ -179,6 +207,7 @@ module Arel
         @order_str = order_str
         @table_name = table_name
         @orders = @order_str.split(/,/).map{|order| order.strip}.map{|str| Order.new(table_name, str)}
+        puts "orders = #{@orders}"
       end
 
       def execute(records)

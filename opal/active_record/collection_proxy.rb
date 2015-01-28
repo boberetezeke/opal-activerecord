@@ -1,4 +1,6 @@
 module ActiveRecord
+  LAZY_METHODS = [:first, :last, :all, :load, :reverse, :empty?, :each, :each_with_index, :map, :inject, :size, :count]
+
   class CollectionProxy
     def initialize(connection, owner, association)
       @connection = connection
@@ -39,7 +41,7 @@ module ActiveRecord
     end
 
     def method_missing(sym, *args, &block)
-      if [:first, :last, :all, :load, :reverse, :empty?].include?(sym)
+      if LAZY_METHODS.include?(sym)
         debug "CollectionProxy: method_missing: #{sym}"
         relation.send(sym, *args, &block)
       elsif @association.klass.scopes[sym]
