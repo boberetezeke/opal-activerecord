@@ -249,7 +249,7 @@ describe "ActiveRecord::Base" do
         expect{A.find(old_id)}.to raise_error(ActiveRecord::RecordNotFound)
         expect(A.find(new_id).id).to eq(new_id)
       end
-      
+
     end
 
     context "when object observers are present" do
@@ -682,4 +682,4 @@ describe "ActiveRecord::Base" do
     end
   end
 end
- 
+

@@ -10,7 +10,7 @@ module ActiveRecord
     attr_reader :singular, :plural, :element, :collection,
       :singular_route_key, :route_key, :param_key, :i18n_key,
       :name
-    
+
     def initialize(klass)
       @singular = klass.to_s
       @singular = @singular[0..0].downcase + @singular[1..-1]
@@ -108,7 +108,7 @@ module ActiveRecord
 
         # convert to uppercase name
         class_name = class_name.camelize
-        klass = Object.const_get(class_name) 
+        klass = Object.const_get(class_name)
       end
 
       klass = self unless klass
@@ -168,7 +168,7 @@ module ActiveRecord
       @associations ||= {}
       @associations[name.to_s] = Association.new(self, :belongs_to, name, options, @connection)
     end
-    
+
     def self.arel_table
       Arel::Table.new(table_name)
     end
@@ -249,15 +249,15 @@ module ActiveRecord
     def method_missing(sym, *args)
       method_name = sym.to_s
       debug "Base#method_missing: #{method_name}, #{attributes}"
-      if m = /(.*)=$/.match(method_name) 
+      if m = /(.*)=$/.match(method_name)
         if args.size == 1
           val = args.shift
           attribute_name = m[1]
           write_value(attribute_name, val)
           debug "Base#method_missing (at end), write #{attribute_name} = #{val}"
-          return 
+          return
         end
-      else 
+      else
         if args.size == 0
           val = read_value(method_name)
           debug "Base#method_missing (at end), val = #{val}"
@@ -337,8 +337,8 @@ module ActiveRecord
     def write_value(name, new_value, options={})
       debug "write_value: name: #{name}, new_value: #{new_value}, options=#{options}"
       assoc = self.class.associations[name]
-      if assoc 
-        if self.id 
+      if assoc
+        if self.id
           if assoc.association_type == :has_many
             write_association_value(assoc, new_value, options)
           elsif assoc.association_type == :belongs_to
@@ -414,7 +414,7 @@ module ActiveRecord
           end
           clear_association_value(assoc)
         end
-      end 
+      end
 
       debug "save: self(after): #{self}"
       if self.id
