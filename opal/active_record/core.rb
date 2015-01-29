@@ -1,5 +1,5 @@
-
 $debug_on = false
+require 'json'
 
 def debug(str)
   #puts(str) if $debug_on
