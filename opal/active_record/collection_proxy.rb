@@ -1,7 +1,12 @@
+require 'forwardable'
+
 module ActiveRecord
   LAZY_METHODS = [:first, :last, :all, :load, :reverse, :empty?, :each, :each_with_index, :map, :inject, :size, :count]
 
   class CollectionProxy
+    extend Forwardable
+    def_delegators :relation, *LAZY_METHODS
+
     def initialize(connection, owner, association)
       @connection = connection
       @owner = owner
@@ -41,10 +46,7 @@ module ActiveRecord
     end
 
     def method_missing(sym, *args, &block)
-      if LAZY_METHODS.include?(sym)
-        debug "CollectionProxy: method_missing: #{sym}"
-        relation.send(sym, *args, &block)
-      elsif @association.klass.scopes[sym]
+      if @association.klass.scopes[sym]
         @association.klass.scopes[sym].call
       else
         super
