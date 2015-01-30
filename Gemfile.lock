@@ -1,17 +1,18 @@
+GIT
+  remote: git://github.com/opal/opal.git
+  revision: bfe44ad2eecdf79a02cf62b46917984236ba593a
+  specs:
+    opal (0.7.0.rc1)
+      hike (~> 1.2)
+      sourcemap (~> 0.1.0)
+      sprockets (>= 2.2.3, < 4.0.0)
+      tilt (~> 1.4)
+
 PATH
   remote: .
   specs:
     opal-activerecord (0.0.1)
       opal (>= 0.5.0, < 1.0.0)
-
-PATH
-  remote: ../opal
-  specs:
-    opal (0.7.0.beta4)
-      hike (~> 1.2)
-      sourcemap (~> 0.1.0)
-      sprockets (>= 2.2.3, < 4.0.0)
-      tilt (~> 1.4)
 
 GEM
   remote: https://rubygems.org/
