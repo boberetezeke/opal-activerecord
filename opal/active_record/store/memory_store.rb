@@ -13,7 +13,6 @@ module ActiveRecord
       table =  @tables[select_manager.table_name.to_s].values.map{|value| {select_manager.table_name => value} }
       debug "MemoryStore#execute: table name = #{select_manager.table_name}"
       debug "MemoryStore#execute: tables = #{@tables.keys}"
-      puts "table = #{table.inspect}"
       debug "MemoryStore#node = #{select_manager.node}"
       records = filter(table)
       debug "MemoryStore#execute: result = #{records.inspect}"

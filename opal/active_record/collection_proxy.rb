@@ -2,10 +2,11 @@ require 'forwardable'
 
 module ActiveRecord
   LAZY_METHODS = [:first, :last, :all, :load, :reverse, :empty?, :each, :each_with_index, :map, :inject, :size, :count]
+  RELATION_METHODS = [:limit, :order, :joins, :where]
 
   class CollectionProxy
     extend Forwardable
-    def_delegators :relation, *LAZY_METHODS
+    def_delegators :relation, *(LAZY_METHODS + RELATION_METHODS)
 
     def initialize(connection, owner, association)
       @connection = connection
@@ -39,10 +40,6 @@ module ActiveRecord
           obj.save
         end
       end
-    end
-
-    def where(*args)
-      relation.where(*args)
     end
 
     def method_missing(sym, *args, &block)
@@ -89,7 +86,8 @@ module ActiveRecord
               )
         end
       else
-        Relation.new(@connection, @association.klass, @association.table_name).where(where_clause => @owner.id)
+        Relation.new(@connection, @association.klass, @association.table_name).
+          where(where_clause => @owner.id)
       end
     end
 

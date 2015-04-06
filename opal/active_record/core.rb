@@ -2,7 +2,7 @@ $debug_on = false
 require 'json'
 
 def debug(str)
-  #puts(str) if $debug_on
+  puts(str) if $debug_on
 end
 
 module ActiveRecord
@@ -23,6 +23,9 @@ module ActiveRecord
   end
 
   class Base
+    include ActiveRecord::Callbacks::InstanceMethods
+    extend ActiveRecord::Callbacks::ClassMethods
+
     def self.new_objects_from_json(json, top_level_class=nil, options={})
       # if its a hash
       if /^\s*{/.match(json)
@@ -222,7 +225,9 @@ module ActiveRecord
     def self.method_missing(sym, *args)
       if [:first, :last, :all, :where, :includes, :order].include?(sym)
         Relation.new(connection, self, table_name).send(sym, *args)
-      elsif @scopes[sym]
+      elsif m = /^(after|before|around)_(.*)/.match(sym.to_s)
+        self.add_callback(m[1], m[2], args)
+      elsif @scopes && @scopes[sym]
         @scopes[sym].call
       else
         super
@@ -369,9 +374,11 @@ module ActiveRecord
             read_association_value(assoc)
           end
         elsif assoc.association_type == :belongs_to
+          debug "Base#read_value: belongs_to: assoc.foreign_key: #{assoc.foreign_key}"
           if read_attribute(assoc.foreign_key)
             debug "Base#read_value: belongs_to (id = #{self.id})"
             debug "Base#read_value: belongs_to: getting from relation: 'id' = #{read_attribute(assoc.foreign_key)}"
+            debug "Base#read_value: Relation.new(connection, #{assoc.klass}, #{assoc.table_name}).where('id' => #{read_attribute(assoc.foreign_key).inspect})"
             Relation.new(connection, assoc.klass, assoc.table_name).where("id" => read_attribute(assoc.foreign_key)).first
           else
             debug "Base#read_value: belongs_to: reading from association_value"
@@ -395,35 +402,37 @@ module ActiveRecord
     end
 
     def save(options={})
-      debug "save: memory(before) = #{connection}"
-      debug "save: self(before): #{self}"
-      self.class.associations.each do |name, assoc|
-        value = read_association_value(assoc)
-        debug "save: association(#{name}) value: #{value.inspect}"
-        if value
-          if assoc.association_type == :has_many
-            value.each do |object|
-              debug "save: has has_many_value: id(#{object.id}), #{object.attributes}"
-              object.save(options)
+      callbackable(:save) do
+        debug "save: memory(before) = #{connection}"
+        debug "save: self(before): #{self}"
+        self.class.associations.each do |name, assoc|
+          value = read_association_value(assoc)
+          debug "save: association(#{name}) value: #{value.inspect}"
+          if value
+            if assoc.association_type == :has_many
+              value.each do |object|
+                debug "save: has has_many_value: id(#{object.id}), #{object.attributes}"
+                object.save(options)
+              end
+            else
+              debug "save: has belongs_to_value: id(#{value.id}), #{value}"
+              # FIXME: this should not be a forced save
+              value.save(options) #unless value.id
+              write_attribute(assoc.foreign_key, value.id)
             end
-          else
-            debug "save: has belongs_to_value: id(#{value.id}), #{value}"
-            # FIXME: this should not be a forced save
-            value.save(options) #unless value.id
-            write_attribute(assoc.foreign_key, value.id)
+            clear_association_value(assoc)
           end
-          clear_association_value(assoc)
         end
-      end
 
-      debug "save: self(after): #{self}"
-      if self.id
-        connection.update(self.class, table_name, self, options)
-      else
-        @attributes['id'] = connection.create(self.class, table_name, self, options)
-      end
+        debug "save: self(after): #{self}"
+        if self.id
+          connection.update(self.class, table_name, self, options)
+        else
+          @attributes['id'] = connection.create(self.class, table_name, self, options)
+        end
 
-      debug "save: memory(after) = #{connection.to_s}"
+        debug "save: memory(after) = #{connection.to_s}"
+      end
     end
 
     def update_id(new_id)

@@ -24,6 +24,30 @@ class E < ActiveRecord::Base
   has_many :cs, through: :ds
 end
 
+class F < ActiveRecord::Base
+  belongs_to :e_ish, class_name: 'E', foreign_key: :e_id
+end
+
+if RUBY_PLATFORM =~ /opal/
+  def time_for
+    diff = nil
+    `var d1 = new Date(); console.log("time:(before)= " + d1.getSeconds() + ":" + d1.getMilliseconds());`
+    100.times do
+      yield
+    end
+    `var d2 = new Date(); console.log("time:(after)= " + d2.getSeconds() + ":" + d2.getMilliseconds());`
+
+    `diff = d2 - d1`
+    puts "diff = #{diff / 100.0}ms"
+    return diff * 0.00001
+  end
+else
+  def time_for
+    yield
+    return 0
+  end
+end
+
 describe "ActiveRecord::Base" do
   if running_with_real_active_record
     before do
@@ -447,6 +471,7 @@ describe "ActiveRecord::Base" do
     let(:d3) { D.new(x:2, y:3) }
     let(:e)  { E.new(x:1) }
     let(:e2) { E.new(x:2) }
+    let(:f)  { F.new(x:1) }
 
     context "when the objects are not yet saved" do
 
@@ -662,6 +687,34 @@ describe "ActiveRecord::Base" do
           expect(b.ds.load).to eq([d])
         end
       end
+
+      context "when doing belongs_to with the class name specified" do
+
+        it "uses the class name" do
+          e.save
+          f.save
+          f.e_ish = e
+          f.save
+
+          expect(F.find(f.id).e_ish).to eq(e)
+        end
+      end
+    end
+  end
+
+  describe "CollectionProxy chaining" do
+    let(:b)  { B.new(x:1) }
+    let(:c)  { C.new(x:1, y:1) }
+    let(:c2) { C.new(x:2, y:1) }
+
+    it "allows relation methods to work on the result of a has_many association" do
+      b.save
+      c.b = b
+      c.save
+      c2.b = b
+      c2.save
+
+      expect(B.find(b.id).cs.order('x asc').limit(1).load).to eq([c])
     end
   end
 
@@ -679,6 +732,53 @@ describe "ActiveRecord::Base" do
 
       expect(A.first.x).to eq(3)
       expect(A.first.y).to eq(2)
+    end
+  end
+
+  describe "performance" do
+    #let(:a) { A.create(x: 1, y: 1) }
+
+    context "when querying for objects" do
+      it "should be fast" do
+        (1..100).each do |n|
+          A.create(x: n, y: 1)
+        end
+        a = nil
+        time = time_for do
+          a = A.where(x: 100, y: 1).load.first
+        end
+        expect(a).to_not be_nil
+        expect(time < 0.02).to eq(true)
+      end
+    end
+
+    context "when accessing attributes" do
+      it "should be fast" do
+        A.create(x: 1)
+        a = A.where(x: 1).first
+        x = nil
+        time = time_for do
+          x = a.x
+        end
+        expect(x).to eq(1)
+        expect(time < 0.005).to eq(true)
+      end
+    end
+
+    context "when accessing through an has_many association" do
+      it "should be fast" do
+        b = B.create(x: 1)
+        100.times do |n|
+          C.create(y: n, b_id: b.id)
+        end
+        y = nil
+        time = time_for do
+          y = b.cs.first.y
+        end
+
+        #expect(y).to eq(1)
+        expect(time < 0.005).to eq(true)
+      end
     end
   end
 end

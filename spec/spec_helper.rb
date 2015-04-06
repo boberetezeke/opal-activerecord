@@ -19,6 +19,7 @@ else
     require_relative '../opal/active_record/collection_proxy'
     require_relative '../opal/active_record/relation'
     require_relative '../opal/active_record/arel'
+    require_relative '../opal/active_record/callbacks'
     require_relative '../opal/active_record/core'
     # uncomment only when running  in MRI
     require 'json'

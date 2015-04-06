@@ -9,18 +9,35 @@ module ActiveRecord
       @connection = connection
       @source_klass = source_klass
       if @association_type == :belongs_to
-        @foreign_key =  "#{name}_id"
+        if options[:foreign_key]
+          @foreign_key = options[:foreign_key]
+        else
+          @foreign_key =  "#{name}_id"
+        end
       elsif @association_type == :has_many
-        @foreign_key = "#{source_klass.table_name.singularize}_id"
+        if options[:foreign_key]
+          @foreign_key = options[:foreign_key]
+        else
+          @foreign_key = "#{source_klass.table_name.singularize}_id"
+        end
       end
     end
 
     def table_name
-      (@association_type == :belongs_to) ? @name.to_s.pluralize : @name.to_s
+      if options[:class_name]
+        class_name = options[:class_name]
+        (@association_type == :belongs_to) ? class_name.underscore.pluralize : class_name.underscore
+      else
+        (@association_type == :belongs_to) ? @name.to_s.pluralize : @name.to_s
+      end
     end
 
     def klass
-      Object.const_get(table_name.singularize.camelize)
+      if options[:class_name]
+        Object.const_get(options[:class_name])
+      else
+        Object.const_get(table_name.singularize.camelize)
+      end
     end
 
     def all
@@ -28,12 +45,8 @@ module ActiveRecord
     end
     alias load all
 
-    def where(query={})
-      Relation.new(query, @connection) 
-    end
-
     def to_s
-      "#Association: #{@source_klass} #{@association_type}: #{@name}"
+      "#Association: (#{@source_klass} #{@association_type}: #{@name}): foreign_key: #{@foreign_key}"
     end
 
     def hash

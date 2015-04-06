@@ -207,7 +207,6 @@ module Arel
         @order_str = order_str
         @table_name = table_name
         @orders = @order_str.split(/,/).map{|order| order.strip}.map{|str| Order.new(table_name, str)}
-        puts "orders = #{@orders}"
       end
 
       def execute(records)
@@ -265,9 +264,22 @@ module Arel
     end
 
     class Limit
-      attr_reader :limit
       def initialize(limit)
         @limit = limit
+      end
+
+      def limit(records)
+        records[0..(@limit -1)]
+      end
+    end
+
+    class Offset
+      def initialize(offset)
+        @offset = offset
+      end
+
+      def offset(records)
+        records[@offset..-1]
       end
     end
 
