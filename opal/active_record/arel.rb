@@ -76,7 +76,7 @@ module Arel
         Equality.new(self, convert_to_node(node_or_value))
       end
 
-      def ne(node_or_value)
+      def not_eq(node_or_value)
         NotEqual.new(self, convert_to_node(node_or_value))
       end
 
