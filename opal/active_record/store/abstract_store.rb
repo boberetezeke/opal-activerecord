@@ -18,8 +18,15 @@ module ActiveRecord
       debug "notify_observers: change = #{change}, object = #{object}, options = #{options}"
       @observers.each do |observer|
         debug "observer.options = #{observer.options}"
-        next if options[:from_remote] &&     observer.options[:local_only]
-        next if !(options[:from_remote]) &&  observer.options[:remote_only]
+
+        if observer.options[:local_only]
+          next if (options[:from_remote] || options[:local_only])
+        end
+                
+        if observer.options[:remote_only]
+          next if !(options[:from_remote])
+        end
+
         debug "notifying observers!!"
 
         if observer.select_manager
