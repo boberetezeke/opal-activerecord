@@ -401,6 +401,10 @@ module ActiveRecord
       connection.destroy(self.class, table_name, self, options)
     end
 
+    def reload
+      self
+    end
+
     def save(options={})
       callbackable(:save) do
         debug "save: memory(before) = #{connection}"
