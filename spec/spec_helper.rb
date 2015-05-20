@@ -67,3 +67,6 @@ def running_with_real_active_record
   ENV['run_with_real_active_record']
 end
 
+def generate_new_id(old_id)
+  old_id.to_s.gsub(/\d+/) { |digits| (digits.to_i + 100).to_s}
+end

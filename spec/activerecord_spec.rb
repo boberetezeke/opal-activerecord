@@ -266,7 +266,8 @@ describe "ActiveRecord::Base" do
 
       it "should update the id in storage" do
         old_id = a.id
-        new_id = old_id + 100
+        # handle both a number as an id or T-1
+        new_id = generate_new_id(old_id)
 
         a.update_id(new_id)
 
@@ -412,8 +413,11 @@ describe "ActiveRecord::Base" do
       if !running_with_real_active_record
         it "is in the store after the save" do
           a.save
-          #expect(memory_store.tables["as"].size).to eq(1)
-          expect(mock_local_storage.get("as:index").size).to eq(1)
+          if memory_store.is_a?(ActiveRecord::MemoryStore)
+            expect(memory_store.tables["as"].size).to eq(1)
+          else
+            expect(mock_local_storage.get("as:index").size).to eq(1)
+          end
         end
       end
 

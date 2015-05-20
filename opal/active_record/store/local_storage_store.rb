@@ -129,34 +129,9 @@ module ActiveRecord
       table = get_table(select_manager.table_name)
       table = table.get_all_record_attributes.map  { |attributes| {select_manager.table_name => attributes} }
       debug "LocalStorageStore#execute(begin): table = #{table.inspect}"
-      select_manager.joins.each do |join|
-        debug "LocalStorageStore#execute(join): join = #{join.inspect}"
-        join.join_spec.each do |association_from, association_to|
-          table_name = association_from.table_name
-          table_2 = get_table(table_name).get_all_record_attributes.map  { |attributes| {table_name => attributes} }
-          debug "LocalStorageStore#execute(join): table_2 = #{table_2.inspect}"
-          if association_from.association_type == :has_many
-            table = join_tables(table, table_2, select_manager.table_name, 'id', table_name, association_from.foreign_key.to_s)
-          else
-            table = join_tables(table, table_2, select_manager.table_name, association_from.foreign_key.to_s, table_name, 'id')
-          end
-          debug "LocalStorageStore#execute(join): table = #{table.inspect}"
-
-          if association_to
-            table_name = association_to.table_name
-            table_2 = get_table(table_name).get_all_record_attributes.map  { |attributes| {table_name => attributes} }
-            debug "LocalStorageStore#execute(join2): table_2 = #{table.inspect}"
-            if association_to.association_type == :has_many
-              table = join_tables(table, table_2, association_from.table_name, 'id', table_name, association_to.foreign_key.to_s)
-            else
-              table = join_tables(table, table_2, association_from.table_name, association_to.foreign_key.to_s, table_name, 'id')
-            end
-            debug "LocalStorageStore#execute(join2): table = #{table.inspect}"
-          end
-        end
-      end
+      table = execute_join(select_manager, table)
       debug "LocalStorageStore#execute(end): table = #{table.inspect}"
-      records = filter(table, select_manager ).map { |record| select_manager.klass.new(record[select_manager.table_name]) }
+      records = filter(table, select_manager )
       debug "LocalStorageStore#execute(end): result = #{records.inspect}"
       records
     end
@@ -226,7 +201,11 @@ module ActiveRecord
       end.join(", ")
     end
 
-    private
+    def get_all_record_attributes(table_name)
+      get_table(table_name).get_all_record_attributes
+    end
+
+    protected
 
     def get_table(table_name)
       table = @tables[table_name] 

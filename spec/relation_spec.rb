@@ -16,6 +16,7 @@ describe ActiveRecord::Relation do
 
   let(:mock_local_storage)  { MockLocalStorage.new }
   let(:memory_store)        { ActiveRecord::LocalStorageStore.new(mock_local_storage) }
+  #let(:memory_store)        { ActiveRecord::MemoryStore.new }
   let!(:q1)                 { create_object(Q, "qs", x: 1, y: 3) }
   let!(:q2)                 { create_object(Q, "qs", x: 2, y: 3) }
   let!(:q3)                 { create_object(Q, "qs", x: 2, y: 4) }
@@ -38,7 +39,7 @@ describe ActiveRecord::Relation do
     end
 
     it "retrieves an empty array when there are no matches" do
-      expect(ActiveRecord::Relation.new(memory_store, Q, 'qs').where(id: q1.id+100).load).to eq([])
+      expect(ActiveRecord::Relation.new(memory_store, Q, 'qs').where(id: generate_new_id(q1.id)).load).to eq([])
     end
     
     context "when using arel_table" do

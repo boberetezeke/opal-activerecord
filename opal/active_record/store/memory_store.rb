@@ -1,5 +1,10 @@
 module ActiveRecord
   class MemoryStore < AbstractStore
+    class Table < Hash
+      def get_all_record_attributes
+      end
+    end
+
     attr_reader :tables
 
     def initialize
@@ -14,7 +19,10 @@ module ActiveRecord
       debug "MemoryStore#execute: table name = #{select_manager.table_name}"
       debug "MemoryStore#execute: tables = #{@tables.keys}"
       debug "MemoryStore#node = #{select_manager.node}"
-      records = filter(table)
+      debug "MemoryStore#execute(begin): table = #{table.inspect}"
+      table = execute_join(select_manager, table)
+      debug "MemoryStore#execute(end): table = #{table.inspect}"
+      records = filter(table, select_manager)
       debug "MemoryStore#execute: result = #{records.inspect}"
       records
     end
@@ -31,15 +39,18 @@ module ActiveRecord
         record = nil
       end
 
-      raise "record not found" unless record
-      record
+      if record
+        klass.new(record)
+      else
+        raise ActiveRecord::RecordNotFound.new("Record not found: class #{klass}, id #{id}") unless record
+      end
     end
 
-    def create(klass, table_name, record, options)
+    def create(klass, table_name, record, options={})
       debug "MemoryStore#Create(#{record})"
       init_new_table(table_name)
       next_id = gen_next_id(table_name)
-      @tables[table_name][next_id] = record
+      @tables[table_name][next_id] = record.attributes.dup.merge({"id" =>  next_id})
       notify_observers(:insert, record, options)
       return next_id
     end
@@ -49,9 +60,9 @@ module ActiveRecord
       table = @tables[table_name]
       old_attributes = table[record.id]
       if old_attributes
-        notify_observers(:update, record, options) if record.attributes != table[record.id]
+        notify_observers(:update, record, options) if record.attributes != old_attributes
       end
-      table[record.id] = record
+      table[record.id] = record.attributes.dup
     end
 
     def update_id(klass, table_name, old_id, new_id, options={})
@@ -66,6 +77,20 @@ module ActiveRecord
       @tables[table_name].delete(record.id)
     end
 
+    def to_s
+      "tables: #{@tables.inspect}, next_ids: #{@next_ids.inspect}"
+    end
+
+    protected
+
+    def get_all_record_attributes(table_name)
+      @tables[table_name].values
+    end
+
+    def get_table(table_name)
+      @tables[table_name]
+    end
+
     def gen_next_id(table_name)
       next_id = @next_ids[table_name]
       @next_ids[table_name] += 1
@@ -77,8 +102,5 @@ module ActiveRecord
       @next_ids[table_name] ||= 1
     end
 
-    def to_s
-      "tables: #{@tables.inspect}, next_ids: #{@next_ids.inspect}"
-    end
   end
 end

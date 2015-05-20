@@ -39,8 +39,39 @@ module ActiveRecord
       end
     end
 
+    def execute_join(select_manager, table)
+      select_manager.joins.each do |join|
+        debug "LocalStorageStore#execute(join): join = #{join.inspect}"
+        join.join_spec.each do |association_from, association_to|
+          table_name = association_from.table_name
+          table_2 = get_all_record_attributes(table_name).map  { |attributes| {table_name => attributes} }
+          debug "LocalStorageStore#execute(join): table_2 = #{table_2.inspect}"
+          if association_from.association_type == :has_many
+            table = join_tables(table, table_2, select_manager.table_name, 'id', table_name, association_from.foreign_key.to_s)
+          else
+            table = join_tables(table, table_2, select_manager.table_name, association_from.foreign_key.to_s, table_name, 'id')
+          end
+          debug "LocalStorageStore#execute(join): table = #{table.inspect}"
+
+          if association_to
+            table_name = association_to.table_name
+            table_2 = get_all_record_attributes(table_name).map  { |attributes| {table_name => attributes} }
+            debug "LocalStorageStore#execute(join2): table_2 = #{table.inspect}"
+            if association_to.association_type == :has_many
+              table = join_tables(table, table_2, association_from.table_name, 'id', table_name, association_to.foreign_key.to_s)
+            else
+              table = join_tables(table, table_2, association_from.table_name, association_to.foreign_key.to_s, table_name, 'id')
+            end
+            debug "LocalStorageStore#execute(join2): table = #{table.inspect}"
+          end
+        end
+      end
+
+      table
+    end
+
     def filter(records, select_manager)
-      select_manager.filter(records)
+      select_manager.filter(records).map { |record| select_manager.klass.new(record[select_manager.table_name]) }
     end
 
     def record_matches(record, select_manager)
