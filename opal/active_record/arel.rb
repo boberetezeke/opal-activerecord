@@ -221,10 +221,18 @@ module Arel
             break if val1 != val2
           end
 
-          if non_matching_order.descending?
-            val2 <=> val1
+          # sort nils to end
+          if val1.nil? && !val2.nil?
+            1
+          elsif val2.nil? && !val1.nil?
+            -1
           else
-            val1 <=> val2
+            # they either are both nil or both not nil
+            if non_matching_order.descending?
+              val2 <=> val1
+            else
+              val1 <=> val2
+            end
           end
         end
       end
