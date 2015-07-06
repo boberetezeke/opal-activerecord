@@ -224,7 +224,7 @@ module ActiveRecord
     end
 
     def self.method_missing(sym, *args)
-      if [:first, :last, :all, :where, :includes, :order].include?(sym)
+      if [:first, :last, :all, :where, :includes, :order, :reorder].include?(sym)
         Relation.new(connection, self, table_name).send(sym, *args)
       elsif m = /^(after|before|around)_(.*)/.match(sym.to_s)
         self.add_callback(m[1], m[2], args)

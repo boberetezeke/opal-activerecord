@@ -2,7 +2,7 @@ require 'forwardable'
 
 module ActiveRecord
   LAZY_METHODS = [:first, :last, :all, :load, :reverse, :empty?, :each, :each_with_index, :map, :inject, :size, :count]
-  RELATION_METHODS = [:limit, :order, :joins, :where]
+  RELATION_METHODS = [:limit, :order, :reorder, :joins, :where]
 
   class CollectionProxy
     extend Forwardable

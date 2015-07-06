@@ -25,6 +25,10 @@ module ActiveRecord
       self
     end
 
+    def reorder(order_str)
+      order(order_str)
+    end
+
     def order(order_str)
       @select_manager.ordering = Arel::Nodes::Ordering.new(@select_manager.table_name, order_str)
       self
