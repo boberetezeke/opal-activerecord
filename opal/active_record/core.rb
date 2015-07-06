@@ -139,6 +139,7 @@ module ActiveRecord
     def self.validates_confirmation_of(*args); end
     def self.validates_numericality_of(*args); end
     def self.validate(*args); end
+    def self.validates(*args); end
 
     def self.default_scope(*args)
       if args.size == 1 && args.first.is_a?(Proc)
