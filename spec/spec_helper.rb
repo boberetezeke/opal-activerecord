@@ -15,6 +15,8 @@ else
     require_relative '../opal/active_record/store/abstract_store'
     require_relative '../opal/active_record/store/local_storage_store'
     require_relative '../opal/active_record/store/memory_store'
+    require_relative '../opal/active_record/store/store_id_generator'
+    require_relative '../opal/active_record/store/store_id'
     require_relative '../opal/active_record/association'
     require_relative '../opal/active_record/collection_proxy'
     require_relative '../opal/active_record/relation'

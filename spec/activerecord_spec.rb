@@ -72,8 +72,8 @@ describe "ActiveRecord::Base" do
   else
     # only set memory_store for opal
     let(:mock_local_storage) { MockLocalStorage.new }
-    let(:memory_store) { ActiveRecord::LocalStorageStore.new(mock_local_storage) }
-    #let(:memory_store) { ActiveRecord::MemoryStore.new }
+    #let(:memory_store) { ActiveRecord::LocalStorageStore.new(mock_local_storage) }
+    let(:memory_store) { ActiveRecord::MemoryStore.new }
     before do
       ActiveRecord::Base.connection = memory_store
     end
@@ -265,7 +265,8 @@ describe "ActiveRecord::Base" do
       end
 
       it "should update the id in storage" do
-        old_id = a.id
+        old_id = a.id.dup
+        puts "old_id = #{old_id}"
         # handle both a number as an id or T-1
         new_id = generate_new_id(old_id)
 
@@ -273,6 +274,20 @@ describe "ActiveRecord::Base" do
 
         expect{A.find(old_id)}.to raise_error(ActiveRecord::RecordNotFound)
         expect(A.find(new_id).id).to eq(new_id)
+      end
+
+      it "should update all copies of objects with this id" do
+        a1 = A.find(a.id)
+        a2 = A.where(x: 1).first
+        a3 = a2.dup
+
+        new_id = generate_new_id(a.id)
+        a.update_id(new_id)
+
+        expect(A.find(new_id).id).to eq(new_id)
+        expect(a1.id).to eq(new_id)
+        expect(a2.id).to eq(new_id)
+        expect(a3.id).to eq(new_id)
       end
 
     end

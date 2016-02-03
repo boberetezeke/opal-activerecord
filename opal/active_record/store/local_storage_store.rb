@@ -48,17 +48,49 @@ module ActiveRecord
     # allows reading and writing of individual record attribute hashes
     #
     class Table
+      class LocalStorageIdGenerator
+        def initialize(table_name, local_storage)
+          @table_name = table_name
+          @local_storage = local_storage
+          @store_id_generator = get_store_id_generator
+        end
+
+        def next_id
+          id = @store_id_generator.next_id
+          put_store_id_generator(@store_id_generator)
+          id
+        end
+
+        private
+
+        def get_store_id_generator
+          json = @local_storage.get(store_id_generator_name)
+          if json
+            store_id_generator = StoreIdGenerator.new_from_json(json)
+          else
+            store_id_generator = StoreIdGenerator.new
+            put_store_id_generator(@store_id_generator)
+          end
+
+          store_id_generator
+        end 
+
+        def put_store_id_generator(store_id_generator)
+          @local_storage.set(store_id_generator_name, store_id_generator.to_json)
+        end
+
+        def store_id_generator_name
+          "#{@table_name}:next_store_id_generator_json"
+        end
+      end
+
       attr_reader :next_id
 
       def initialize(name, local_storage)
-        @local_storage = local_storage
         @name = name
+        @local_storage = local_storage
         @index = Index.new(name, local_storage)
-        @next_id = get_next_id
-        if !@next_id
-          @next_id = 1
-          put_next_id
-        end
+        @local_storage_id_generator = LocalStorageIdGenerator.new(name, local_storage)
       end
 
       def get_record_attributes(id)
@@ -83,17 +115,7 @@ module ActiveRecord
       end
 
       def generate_next_id
-        @next_id += 1
-        put_next_id
-        @next_id
-      end
-
-      def get_next_id
-        @local_storage.get(next_id_name)
-      end 
-
-      def put_next_id
-        @local_storage.set(next_id_name, @next_id)
+        @next_id = @local_storage_id_generator.next_id
       end
 
       private
@@ -102,9 +124,6 @@ module ActiveRecord
         "#{@name}:#{id}"
       end
 
-      def next_id_name
-        "#{@name}:next_id"
-      end
     end
 
     #
@@ -180,6 +199,7 @@ module ActiveRecord
       table = get_table(table_name)
       record_attributes = table.get_record_attributes(old_id)
       table.delete_record_attributes(old_id)
+      #store_id.resolve_to(new_id) if store_id
       record_attributes['id'] = new_id
       table.put_record_attributes(new_id, record_attributes)
     end
@@ -190,6 +210,10 @@ module ActiveRecord
       table.delete_record_attributes(record.id)
     end
 
+    def all_for_table(table_name)
+      table = get_table(table_name)
+      table.get_all_record_attributes
+    end
 
     def init_new_table(table_name)
       get_table(table_name)

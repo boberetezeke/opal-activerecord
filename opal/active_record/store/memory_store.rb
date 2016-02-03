@@ -11,6 +11,7 @@ module ActiveRecord
       super
 
       @tables = {}
+      @table_store_ids = {}
       @next_ids = {}
     end
 
@@ -34,6 +35,8 @@ module ActiveRecord
     end
 
     def find(klass, table_name, id)
+      puts "in find(#{id}): #{@tables[table_name].inspect}"
+
       if @tables[table_name]
         record = get_record_from_table(@tables[table_name], id)
       else
@@ -72,13 +75,21 @@ module ActiveRecord
     def update_id(klass, table_name, old_id, new_id, options={})
       table = @tables[table_name]
       record = remove_record_from_table(table, old_id)
-      record[:id] = new_id
-      store_record_on_table(table, new_id, record)
+      store_id = @table_store_ids[table_name].delete(old_id)
+      store_id.resolve_to(new_id) if store_id
+      store_record_on_table(table, store_id, record)
+
+      #record['id'] = new_id
+      #store_record_on_table(table, new_id, record)
     end
 
     def destroy(klass, table_name, record, options={})
       notify_observers(:delete, record, options)
       remove_record_from_table(@tables[table_name], record.id)
+    end
+
+    def all_for_table(table_name)
+      @tables[table_name].values
     end
 
     def to_s
@@ -98,18 +109,27 @@ module ActiveRecord
     private
 
     def gen_next_id(table_name)
-      next_id = @next_ids[table_name]
-      @next_ids[table_name] += 1
-      return "T-#{next_id}"
+      #next_id = @next_ids[table_name]
+      #@next_ids[table_name] += 1
+      #return "T-#{next_id}"
+      id = @next_ids[table_name].next_id
+      @table_store_ids[table_name][id] = id
+      id
     end
 
     def init_new_table(table_name)
       @tables[table_name] ||= {}
-      @next_ids[table_name] ||= 1
+      @table_store_ids[table_name] ||= {}      
+      @next_ids[table_name] ||= StoreIdGenerator.new # 1
     end
 
     def store_record_on_table(table, id, record)
       table[id.to_s] = record
+    end
+
+    def update_record_hash_key(table, old_id, new_id)
+      record = table.delete(old_id.to_s)
+      table[new_id.to_s] = record
     end
 
     def get_record_from_table(table, id)

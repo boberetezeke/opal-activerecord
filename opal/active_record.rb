@@ -1,5 +1,7 @@
 require 'active_record/core_ext/string'
 require 'active_record/local_storage'
+require 'active_record/store/store_id'
+require 'active_record/store/store_id_generator'
 require 'active_record/store/abstract_store'
 require 'active_record/store/local_storage_store'
 require 'active_record/store/memory_store'
