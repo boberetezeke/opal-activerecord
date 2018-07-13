@@ -1,1 +1,1 @@
-require 'opal/activerecord'
+require 'opal/active_record'

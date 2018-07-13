@@ -135,16 +135,20 @@ module ActiveRecord
           if value(:table1) == value(:table2)
             @iterators[:table2_match] = @iterators[:table2].dup
             get_row(:table2_match)
-            loop do
-              push_row
-              break if !next_row(:table2_match)
-              value1 = value(:table1)
-              value2 = value(:table2_match)
-              break if value(:table1) != value(:table2_match)
-            end
+            inner_join_loop
           end
 
           break if !next_row(:table1)
+        end
+      end
+      
+      def inner_join_loop
+        loop do
+          push_row
+          break if !next_row(:table2_match)
+          value1 = value(:table1)
+          value2 = value(:table2_match)
+          break if value(:table1) != value(:table2_match)
         end
       end
 

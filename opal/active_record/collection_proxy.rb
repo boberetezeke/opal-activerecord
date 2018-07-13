@@ -57,7 +57,7 @@ module ActiveRecord
     private
 
     def relation
-      where_clause = "#{@owner.table_name.singularize}_id"
+      where_clause = "#{singularize(@owner.table_name)}_id"
       debug "CollectionProxy: relation: for table: #{@association.table_name}, where: #{where_clause} == #{@owner.id}"
       if through = @association.options[:through]
         through_association = @association.source_klass.associations[through.to_s]
@@ -73,13 +73,13 @@ module ActiveRecord
 
         if destination_to_through_association.association_type == :has_many
           Relation.new(@connection, destination_klass, destination_klass.table_name).
-              joins(through_klass.table_name => source_klass.table_name.singularize).
+              joins(through_klass.table_name => singularize(source_klass.table_name)).
               where(through_klass.arel_table[destination_to_through_association.foreign_key].eq(destination_klass.arel_table[:id]).
                 and(through_klass.arel_table[through_to_source_association.foreign_key].eq(@owner.id))
               )
         else
           Relation.new(@connection, destination_klass, destination_klass.table_name).
-              joins(through_klass.table_name.singularize => source_klass.table_name.singularize).
+              joins(singularize(through_klass.table_name) => singularize(source_klass.table_name)).
               where(
                 destination_klass.arel_table[destination_to_through_association.foreign_key].eq(through_klass.arel_table[:id]).
                 and(through_klass.arel_table[through_to_source_association.foreign_key].eq(@owner.id))
@@ -95,6 +95,11 @@ module ActiveRecord
       from_klass.associations.values.select do |assoc|
         assoc.klass == to_klass
       end.first
+    end
+
+    def singularize(str)
+      s = str.singularize
+      s ? s : str
     end
   end
 end

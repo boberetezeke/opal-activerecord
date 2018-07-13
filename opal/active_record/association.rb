@@ -18,7 +18,7 @@ module ActiveRecord
         if options[:foreign_key]
           @foreign_key = options[:foreign_key]
         else
-          @foreign_key = "#{source_klass.table_name.singularize}_id"
+          @foreign_key = "#{singularize(source_klass.table_name)}_id"
         end
       end
     end
@@ -36,7 +36,9 @@ module ActiveRecord
       if options[:class_name]
         Object.const_get(options[:class_name])
       else
-        Object.const_get(table_name.singularize.camelize)
+        const_name = singularize(table_name).camelize
+        Object.const_get(const_name)
+        #Object.const_get(table_name.singularize.camelize)
       end
     end
 
@@ -51,6 +53,11 @@ module ActiveRecord
 
     def hash
       name.to_s.hash
+    end
+
+    def singularize(str)
+      s = str.singularize
+      s ? s : str
     end
   end
 end

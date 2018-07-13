@@ -163,6 +163,18 @@ module ActiveRecord
       @scopes || {}
     end
 
+    def self.serialize(*args)
+      @serialized_attributes = args
+    end
+
+    def self.serialized_attribute?(attribute_name)
+      if @serialized_attributes
+        @serialized_attributes.include?(attribute_name.to_sym)
+      else
+        false
+      end
+    end
+
     def self.has_many(name, options={})
       @associations ||= {}
       @associations[name.to_s] = Association.new(self, :has_many, name, options, @connection)
@@ -224,7 +236,7 @@ module ActiveRecord
     end
 
     def self.method_missing(sym, *args)
-      if [:first, :last, :all, :where, :includes, :order, :reorder].include?(sym)
+      if [:first, :last, :all, :where, :includes, :order, :reorder, :limit, :offset].include?(sym)
         Relation.new(connection, self, table_name).send(sym, *args)
       elsif m = /^(after|before|around)_(.*)/.match(sym.to_s)
         self.add_callback(m[1], m[2], args)
@@ -294,6 +306,10 @@ module ActiveRecord
     def write_attribute(attribute_name, new_value)
       attribute_name = attribute_name.to_s
       old_value = self.attributes[attribute_name]
+      # NOTE: this should serialize using YAML
+      #if self.class.serialized_attribute?(attribute_name) && !new_value.is_a?(String)
+      #  new_value = new_value.to_json
+      #end
       self.attributes[attribute_name] = new_value
 
       if old_value != new_value
@@ -306,7 +322,12 @@ module ActiveRecord
     end
 
     def read_attribute(attribute_name)
-      self.attributes[attribute_name.to_s]
+      value =  self.attributes[attribute_name.to_s]
+      # NOTE: this should deserialize using YAML
+      #if self.class.serialized_attribute?(attribute_name)
+      #  value = JSON.parse(value)
+      #end
+      value
     end
 
     def write_association_value(assoc, values_or_value, options={})
@@ -446,6 +467,10 @@ module ActiveRecord
 
     def persisted?
       read_attribute(:id) != nil
+    end
+    
+    def valid?
+      true
     end
 
     def id

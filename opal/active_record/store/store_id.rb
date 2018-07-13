@@ -18,7 +18,7 @@ class StoreId
   end
 
   def hash
-    @id_value.hash + @resolved.hash
+    @id_value.hash + (@resolved ? "t" : "f")
   end
 
   def dup

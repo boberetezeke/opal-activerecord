@@ -1,6 +1,7 @@
 require 'spec_helper'
 
 class A < ActiveRecord::Base
+  serialize :a
 end
 
 class B < ActiveRecord::Base
@@ -80,6 +81,20 @@ describe "ActiveRecord::Base" do
   end
 
   if !running_with_real_active_record
+=begin
+    describe ".serialize" do
+      it "should convert to JSON and back" do
+        a = A.new
+        hash = {"nested" => ['hash', 'of', 1, 'thing']}
+        a.a = hash
+        a.save
+        expect(A.first.a).to eq(hash)
+        if memory_store.is_a?(ActiveRecord::MemoryStore)
+          expect(memory_store.raw_find("as", a.id)["a"]).to eq(hash.to_json)
+        end
+      end
+    end
+=end
     describe ".new_from_hash" do
       context "when constructing just one object" do
         context "when using a top level class" do

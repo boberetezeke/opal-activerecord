@@ -35,19 +35,23 @@ module ActiveRecord
     end
 
     def find(klass, table_name, id)
-      puts "in find(#{id}): #{@tables[table_name].inspect}"
+      record = raw_find(table_name, id)
+      if record
+        klass.new(record)
+      else
+        raise ActiveRecord::RecordNotFound.new("Record not found: class #{klass}, id #{id.inspect}") unless record
+      end
+    end
+    
+    def raw_find(table_name, id)
+      #puts "in find(#{id}): #{@tables[table_name].inspect}"
 
       if @tables[table_name]
         record = get_record_from_table(@tables[table_name], id)
       else
         record = nil
       end
-
-      if record
-        klass.new(record)
-      else
-        raise ActiveRecord::RecordNotFound.new("Record not found: class #{klass}, id #{id.inspect}") unless record
-      end
+      record
     end
 
     def create(klass, table_name, record, options={})
