@@ -180,6 +180,11 @@ module ActiveRecord
       @associations[name.to_s] = Association.new(self, :has_many, name, options, @connection)
     end
 
+    def self.has_one(name, options={})
+      @associations ||= {}
+      @associations[name.to_s] = Association.new(self, :has_one, name, options, @connection)
+    end
+
     def self.belongs_to(name, options={})
       @associations ||= {}
       @associations[name.to_s] = Association.new(self, :belongs_to, name, options, @connection)
@@ -332,7 +337,7 @@ module ActiveRecord
 
     def write_association_value(assoc, values_or_value, options={})
       debug "write_association_value: #{assoc}, #{values_or_value}, options = #{options}"
-      if assoc.association_type == :has_many
+      if assoc.association_type == :has_many || assoc.association_type == :has_one
         if self.id
           values_or_value.each do |object|
             #if object.read_attribute(assoc.foreign_key) != self.id
@@ -352,6 +357,8 @@ module ActiveRecord
       debug "read_association_value: #{assoc}, #{@association_values}"
       if assoc.association_type == :has_many
         @association_values[assoc.name] || []
+      elsif assoc.association_type == :has_one
+        @association_values[assoc.name] || nil
       else
         @association_values[assoc.name]
       end
@@ -366,7 +373,7 @@ module ActiveRecord
       assoc = self.class.associations[name]
       if assoc
         if self.id
-          if assoc.association_type == :has_many
+          if assoc.association_type == :has_many || assoc.association_type == :has_one
             write_association_value(assoc, new_value, options)
           elsif assoc.association_type == :belongs_to
             #if new_value.id
@@ -392,6 +399,12 @@ module ActiveRecord
         if assoc.association_type == :has_many
           if self.id
             CollectionProxy.new(connection, self, assoc)
+          else
+            read_association_value(assoc)
+          end
+        elsif assoc.association_type == :has_one
+          if self.id
+            Relation.new(connection, assoc.klass, assoc.table_name.pluralize).where(assoc.foreign_key => self.id).first
           else
             read_association_value(assoc)
           end
@@ -435,7 +448,7 @@ module ActiveRecord
           value = read_association_value(assoc)
           debug "save: association(#{name}) value: #{value.inspect}"
           if value
-            if assoc.association_type == :has_many
+            if assoc.association_type == :has_many || assoc.association_type == :has_one
               value.each do |object|
                 debug "save: has has_many_value: id(#{object.id}), #{object.attributes}"
                 object.save(options)

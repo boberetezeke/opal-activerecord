@@ -46,7 +46,7 @@ module ActiveRecord
           table_name = association_from.table_name
           table_2 = get_all_record_attributes(table_name).map  { |attributes| {table_name => attributes} }
           debug "LocalStorageStore#execute(join): table_2 = #{table_2.inspect}"
-          if association_from.association_type == :has_many
+          if association_from.association_type == :has_many || association_from.association_type == :has_one
             table = join_tables(table, table_2, select_manager.table_name, 'id', table_name, association_from.foreign_key.to_s)
           else
             table = join_tables(table, table_2, select_manager.table_name, association_from.foreign_key.to_s, table_name, 'id')
@@ -57,7 +57,7 @@ module ActiveRecord
             table_name = association_to.table_name
             table_2 = get_all_record_attributes(table_name).map  { |attributes| {table_name => attributes} }
             debug "LocalStorageStore#execute(join2): table_2 = #{table.inspect}"
-            if association_to.association_type == :has_many
+            if association_to.association_type == :has_many || association_from.association_type == :has_one
               table = join_tables(table, table_2, association_from.table_name, 'id', table_name, association_to.foreign_key.to_s)
             else
               table = join_tables(table, table_2, association_from.table_name, association_to.foreign_key.to_s, table_name, 'id')
