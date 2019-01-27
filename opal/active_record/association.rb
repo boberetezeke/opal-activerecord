@@ -15,7 +15,6 @@ module ActiveRecord
           @foreign_key =  "#{name}_id"
         end
       elsif @association_type == :has_many || @association_type == :has_one
-        puts "Association#initialize: in has_many"
         if options[:foreign_key]
           @foreign_key = options[:foreign_key]
         else

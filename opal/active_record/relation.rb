@@ -96,7 +96,6 @@ module ActiveRecord
 
     def on_change(block, options={})
       @select_manager.on_change(block, options)
-      return self
     end
   end
 end

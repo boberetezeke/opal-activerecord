@@ -1,17 +1,41 @@
 module ActiveRecord
   class AbstractStore
-    class Observer < Struct.new(:call_back, :select_manager, :options); end
+    class Observer
+      attr_accessor :call_back, :select_manager, :options, :id, :unbinder
+      def initialize(call_back, select_manager, options)
+        @call_back = call_back
+        @select_manager = select_manager
+        @options = options
+      end
+
+      def unobserve
+        @unbinder.call if @unbinder
+      end
+
+      def to_s
+        "Observer-ID: #{@id}"
+      end
+    end
 
     def initialize(*args)
       @observers = []
+      @next_id = 1
     end
 
     def on_change(options={}, &call_back)
-      @observers.push(Observer.new(call_back, nil, options))
+      add_observer(Observer.new(call_back, nil, options))
     end
 
     def on_change_with_select_manager(call_back, select_manager, options={})
-      @observers.push(Observer.new(call_back, select_manager, options)) 
+      add_observer(Observer.new(call_back, select_manager, options))
+    end
+
+    def add_observer(observer)
+      @observers.push(observer)
+      observer.id = next_id = @next_id
+      observer.unbinder = ->{ @observers.delete_if{|o| o.id == next_id } }
+      @next_id += 1
+      observer
     end
 
     def notify_observers(change, object, options={})
