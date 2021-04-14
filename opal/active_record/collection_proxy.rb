@@ -5,6 +5,8 @@ module ActiveRecord
   RELATION_METHODS = [:limit, :order, :reorder, :joins, :where]
 
   class CollectionProxy
+    include SemanticLogger::Loggable
+
     extend Forwardable
     def_delegators :relation, *(LAZY_METHODS + RELATION_METHODS)
 
@@ -101,6 +103,10 @@ module ActiveRecord
     def singularize(str)
       s = str.singularize
       s ? s : str
+    end
+
+    def debug(str)
+      logger.debug str, tags: [:ar, :collection_proxy]
     end
   end
 end

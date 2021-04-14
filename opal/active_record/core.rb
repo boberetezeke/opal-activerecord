@@ -1,9 +1,4 @@
-$debug_on = false
 require 'json'
-
-def debug(str)
-  # puts(str) if $debug_on
-end
 
 module ActiveRecord
   class Name
@@ -23,8 +18,19 @@ module ActiveRecord
   end
 
   class Base
+    include SemanticLogger::Loggable
+    extend SemanticLogger::Loggable
+
     include ActiveRecord::Callbacks::InstanceMethods
     extend ActiveRecord::Callbacks::ClassMethods
+
+    def self.debug(str)
+      logger.debug str, tags: [:ar, :core]
+    end
+
+    def debug(str)
+      logger.debug str, tags: [:ar, :core]
+    end
 
     def self.new_objects_from_json(json, top_level_class=nil, options={})
       # if its a hash

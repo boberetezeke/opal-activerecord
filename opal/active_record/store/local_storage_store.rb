@@ -48,6 +48,8 @@ module ActiveRecord
     # allows reading and writing of individual record attribute hashes
     #
     class Table
+      include SemanticLogger::Loggable
+
       class LocalStorageIdGenerator
         def initialize(table_name, local_storage)
           @table_name = table_name
@@ -124,6 +126,9 @@ module ActiveRecord
         "#{@name}:#{id}"
       end
 
+      def debug(str)
+        logger.info str, tags: [:ar, :local_storage_table]
+      end
     end
 
     #

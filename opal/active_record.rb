@@ -1,3 +1,5 @@
+require 'semantic_logger'
+
 require 'active_record/core_ext/string'
 require 'active_record/local_storage'
 require 'active_record/store/store_id'

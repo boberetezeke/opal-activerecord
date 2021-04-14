@@ -1,5 +1,7 @@
 module ActiveRecord
   class AbstractStore
+    include SemanticLogger::Loggable
+
     class Observer
       attr_accessor :call_back, :select_manager, :options, :id, :unbinder
       def initialize(call_back, select_manager, options)
@@ -103,6 +105,8 @@ module ActiveRecord
     end
 
     class TableJoiner
+      include SemanticLogger::Loggable
+
       class Iterator
         attr_reader :row, :value
 
@@ -191,6 +195,10 @@ module ActiveRecord
       def push_row
         @result_table.push(@iterators[:table1].row.dup.merge(@iterators[:table2_match].row))
       end
+
+      def debug(str)
+        logger.debug str, tags: [:ar, :table_joiner]
+      end
     end
 
     def join_tables(table1,  table2, table1_name, table1_column, table2_name, table2_column)
@@ -199,6 +207,10 @@ module ActiveRecord
       result_table = table_joiner.result_table
       # puts "result_table = #{result_table}"
       result_table
+    end
+
+    def debug(str)
+      logger.debug str, tags: [:abstract_store]
     end
   end
 end

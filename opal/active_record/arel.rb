@@ -1,5 +1,7 @@
 module Arel
   class SelectManager
+    include SemanticLogger::Loggable
+
     attr_accessor :ordering, :limit, :offset, :joins
     attr_accessor :klass, :table_name, :node
 
@@ -56,6 +58,10 @@ module Arel
 
     def on_change(block, options={})
       @connection.on_change_with_select_manager(block, self, options)
+    end
+
+    def debug(str)
+      logger.debug str, tags: [:ar, :arel]
     end
   end
 
